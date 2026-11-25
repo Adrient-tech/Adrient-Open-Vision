@@ -5,3 +5,6 @@
 viewer/scene.json
 *.o
 *.so
+
+# Workspace agent notes (internal, not part of the product)
+.mlai/

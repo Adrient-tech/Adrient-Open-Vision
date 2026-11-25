@@ -4,6 +4,12 @@ Turn live or recorded camera feeds into a real-time 3D world view.
 CPU-first camera perception, multi-object tracking and a browser-based 3D
 scene viewer — one self-contained open-source project.
 
+**Website:** [adrient.com](https://adrient.com)
+
+> OpenVision's design is inspired by Tesla's vision-first vehicle software —
+> a camera-only perception stack that understands lanes, vehicles and the
+> ego path without radar or lidar.
+
 ![status](https://img.shields.io/badge/build-passing-brightgreen)
 
 ## What it does
@@ -41,22 +47,108 @@ python3 -m http.server 3000 --directory viewer
 # open http://localhost:3000
 ```
 
-## Configuration
+## Feeding input
 
-All runtime settings live in `engine/config/openvision.conf`:
+All input settings live in `engine/config/openvision.conf` under the
+`source.*` keys. Three input modes are supported:
+
+### 1. Video file / recorded dataset (default)
+
+```ini
+source.mode             = video
+source.input_video         = /path/to/driving.mp4
+source.input_vehicle_speed = /path/to/frame_speed.txt   # one speed per frame, m/s
+source.video_realtime      = true    # true = play at capture rate, false = as fast as possible
+source.video_loop          = true
+```
+
+A speed file is required for `video` mode; if you don't have one, generate a
+constant-speed file (e.g. one `8.0` line per frame of the video).
+
+Or just point the one-command pipeline at your own footage:
+
+```bash
+scripts/run_pipeline.sh /path/to/driving.mp4 10    # second arg is fps
+```
+
+### 2. Single live camera (webcam / USB / V4L2 device)
+
+```ini
+source.mode        = v4l2
+source.v4l2_device = /dev/video0
+source.v4l2_fps    = 10
+```
+
+Then run the engine from the build directory:
+
+```bash
+cd engine/build
+LD_LIBRARY_PATH=../../third_party/onnxruntime-cpu/lib xvfb-run -a ./OpenVision
+cd ../..
+(cd worldmodel && cargo run --release --bin worldmodel -- \
+    ../engine/build/perception.jsonl ../engine/build/world_state.jsonl 10)
+(cd worldmodel && ./target/release/adapter \
+    ../engine/build/world_state.jsonl ../viewer/scene.json 10)
+```
+
+### 3. Multiple cameras / ROS 2 camera topics
+
+Each engine instance consumes one camera. To run several cameras, run one
+instance per camera with its own config, device (or ROS 2 topic) and
+`world_log_path`, then feed each produced `world_state.jsonl` to the world
+model and merge the scenes with the adapter:
+
+```ini
+source.mode               = ros2
+source.input_camera_topic = /camera/front/image
+world_log_path            = perception_front.jsonl
+```
+
+### 4. 3D recording / simulation view
+
+Set `rrd_on = true` to stream every frame into an `.rrd` recording you can
+open interactively with [Rerun](https://rerun.io):
+
+```bash
+rrd_on = true
+rrd_log = openvision.rrd
+# open with: rerun openvision.rrd
+```
+
+## Camera setup
+
+A forward-facing camera behind the windscreen, under the rear-view mirror,
+works best: 2 MP or higher, horizontal field of view between 50 and 55
+degrees, zero roll, facing forward with a 1–3 degree downward pitch
+(10–15 degrees for tall vehicles). See `engine/Sensing/README.md` and the
+calibration guide in `engine/Calibration/` for the full procedure.
+
+## Configuration reference
 
 | Key | Default | Meaning |
 |---|---|---|
-| `source.mode` | `video` | input source (`video` or `v4l2`) |
+| `source.mode` | `video` | input source (`video`, `v4l2` or `ros2`) |
 | `engine.provider` | `cpu` | ONNX Runtime execution provider |
-| `source.video_realtime` | `false` | run at capture rate or as fast as possible |
+| `source.video_realtime` | `true` | run at capture rate or as fast as possible |
 | `world_log_on` | `true` | write per-frame perception log for the world model |
 | `rrd_on` | `false` | stream to a 3D recording (`*.rrd`) |
 
-The pipeline script writes `engine/config/openvision_test.conf` with the
-sample dataset paths; point `source.input_video` and
-`source.input_vehicle_speed` at your own driving footage to test with
-different videos.
+## Testing
+
+```bash
+# End-to-end: build → perception → world model → adapter on the sample dataset
+scripts/run_pipeline.sh
+
+# Validate the generated scene file
+python3 -c "import json; v=json.load(open('viewer/scene.json')); print(len(v['frames']), 'frames')"
+
+# World model unit tests
+cd worldmodel && cargo test
+```
+
+Then open the viewer (`python3 -m http.server 3000 --directory viewer`) and
+check that vehicles are tracked, the ego path is drawn and the HUD shows a
+lead-vehicle distance.
 
 ## Requirements
 
