@@ -133,11 +133,21 @@ struct Track {
 const Q_POS: f64 = 0.5; // process noise on position [m^2/s]
 const Q_VEL: f64 = 2.0; // process noise on velocity [(m/s)^2/s]
 const R_POS: f64 = 1.0; // measurement noise on projected position [m^2]
-const GATE: f64 = 3.0; // association gate [m] (Mahalanobis ~ 3 sigma)
-const CONFIRM_HITS: u32 = 3;
+const GATE: f64 = 3.0; // association gate [m] at zero speed, fresh track
+const GATE_SPEED_GAIN: f64 = 0.10; // extra gate per m/s of track speed [m/(m/s)]
+const GATE_MISS_GAIN: f64 = 0.50; // extra gate per missed frame while coasting [m]
+const CONFIRM_HITS: u32 = 4;
 const MAX_MISSES: u32 = 10;
 
 impl Track {
+    // Adaptive association radius: fast objects cover more ground per frame and
+    // their velocity estimate is still converging, and a coasting track drifts
+    // further from the truth every missed frame — widen the gate accordingly.
+    fn gate_radius(&self) -> f64 {
+        let speed = (self.vx * self.vx + self.vy * self.vy).sqrt();
+        GATE + GATE_SPEED_GAIN * speed + GATE_MISS_GAIN * self.missed as f64
+    }
+
     fn predict(&mut self, dt: f64) {
         self.x += self.vx * dt;
         self.y += self.vy * dt;
@@ -221,7 +231,7 @@ impl WorldModel {
                 let dx = m.0 - t.x;
                 let dy = m.1 - t.y;
                 let g = (dx * dx / (t.cov_x + R_POS) + dy * dy / (t.cov_y + R_POS)).sqrt();
-                if g <= GATE {
+                if g <= t.gate_radius() {
                     pairs.push((ti, mi, g));
                 }
             }
@@ -303,7 +313,10 @@ impl WorldModel {
             tracks: self
                 .tracks
                 .iter()
-                .filter(|t| t.state != State::Tentative || t.hits > 1)
+                // Tentative tracks stay internal: they are mostly short
+                // fragments (detector dropouts) and flicker in the viewer.
+                // Only confirmed and coasting tracks reach the scene.
+                .filter(|t| t.state != State::Tentative)
                 .map(|t| TrackOut {
                     id: t.id,
                     x: t.x,
@@ -418,7 +431,7 @@ mod tests {
     }
 
     #[test]
-    fn track_confirms_after_three_hits() {
+    fn track_confirms_on_fourth_hit() {
         let mut t = Track {
             id: 1, x: 50.0, y: 0.0, vx: 8.0, vy: 0.0,
             cov_x: R_POS, cov_y: R_POS, age: 1, hits: 1, missed: 0,
@@ -428,7 +441,9 @@ mod tests {
         t.update(50.3, 0.0, 0, 0.1);
         assert_eq!(t.state, State::Tentative, "2 hits must not confirm");
         t.update(50.6, 0.0, 0, 0.1);
-        assert_eq!(t.state, State::Confirmed, "3rd hit must confirm");
+        assert_eq!(t.state, State::Tentative, "3 hits must not confirm");
+        t.update(50.9, 0.0, 0, 0.1);
+        assert_eq!(t.state, State::Confirmed, "4th hit must confirm");
     }
 
     #[test]
@@ -456,21 +471,49 @@ mod tests {
     }
 
     #[test]
+    fn fast_object_keeps_one_id_across_frames() {
+        let mut wm = WorldModel::new(10.0);
+        let mut out = writer();
+        // Object closing at 12 m/s in the ego frame: each frame its ego x
+        // drops 1.2 m. The velocity-predicted, speed-widened gate must keep
+        // matching it to the same track instead of spawning a new ID.
+        for i in 1..=8u64 {
+            let x = 40.0 - 1.2 * (i - 1) as f64;
+            wm.step(&frame(i, 8.0, vec![(0, x, 0.0)]), &mut out);
+        }
+        assert_eq!(wm.tracks.len(), 1, "one physical object must stay one track");
+        assert_eq!(wm.next_id, 2, "no second ID may be created");
+    }
+
+    #[test]
+    fn one_hit_fragments_are_not_emitted_to_the_scene() {
+        let mut wm = WorldModel::new(10.0);
+        let mut out = writer();
+        // A spurious detection appears once and never again: it must never be
+        // emitted to the scene, even in the frame it was created.
+        wm.step(&frame(1, 8.0, vec![(0, 40.0, 0.0)]), &mut out);
+        wm.step(&frame(2, 8.0, vec![]), &mut out);
+        let visible: Vec<_> = wm.tracks.iter().filter(|t| t.state != State::Tentative).collect();
+        assert!(visible.is_empty(), "fragment must not be visible");
+        assert!(wm.tracks.iter().any(|t| t.state == State::Tentative), "track still internal");
+    }
+
+    #[test]
     fn confirmed_track_survives_ten_misses_then_dies() {
         let mut wm = WorldModel::new(10.0);
         let mut out = writer();
-        // Three consecutive frames confirm the track.
-        for i in 1..=3 {
+        // Four consecutive frames confirm the track.
+        for i in 1..=4 {
             wm.step(&frame(i, 8.0, vec![(0, 40.0, 0.0)]), &mut out);
         }
         assert!(wm.tracks.iter().any(|t| t.state == State::Confirmed));
         // Ten missed frames: still alive (MAX_MISSES = 10, delete only when missed > 10).
-        for i in 4..=13 {
+        for i in 5..=14 {
             wm.step(&frame(i, 8.0, vec![]), &mut out);
         }
         assert!(wm.tracks.iter().any(|t| t.state == State::Confirmed), "10 misses must not delete");
         // Eleventh missed frame: gone.
-        wm.step(&frame(14, 8.0, vec![]), &mut out);
+        wm.step(&frame(15, 8.0, vec![]), &mut out);
         assert!(wm.tracks.is_empty(), "track with >10 misses must be deleted");
     }
 
@@ -479,11 +522,11 @@ mod tests {
         let mut wm = WorldModel::new(10.0);
         let mut out = writer();
         // Two objects ahead: far on-path (x=40) and near off-path (y=3.0).
-        for i in 1..=3 {
+        for i in 1..=4 {
             wm.step(&frame(i, 8.0, vec![(0, 40.0, 0.0), (0, 20.0, 3.0)]), &mut out);
         }
         let mut last = Frame {
-            frame_id: 4,
+            frame_id: 5,
             ego_v: 8.0,
             wall_ms: 0.0,
             cipo: Cipo { valid: false, d: 0.0, v: 0.0, cut_in: false },
@@ -494,7 +537,7 @@ mod tests {
         assert_eq!(wm.next_id, 3, "two tracks must have been created");
         assert!(
             wm.tracks.iter().all(|t| t.state == State::Confirmed),
-            "both tracks confirmed after 3 hits"
+            "both tracks confirmed after 4 hits"
         );
         // CIPO selection lives in step(): nearest confirmed, |y| < 1.8, in front.
         // Off-path near track (y≈3.0) must be excluded → only the far on-path
