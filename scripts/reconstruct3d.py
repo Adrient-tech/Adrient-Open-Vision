@@ -114,7 +114,7 @@ def main():
                     & (height < MAX_H_M)
                 )
                 X = ego_x[fid] + R[keep] * (ex[keep] / np.maximum(R_ground[keep], 1e-6))
-                Y = R[keep] * (ey[keep] / np.maximum(R_ground[keep], 1e-6))
+                Y = ey[keep]  # lateral straight from the ground homography
                 Z = height[keep]
                 finite = np.isfinite(X) & np.isfinite(Y) & np.isfinite(Z)
                 X, Y, Z = X[finite], Y[finite], Z[finite]
