@@ -83,7 +83,7 @@
   <div class="row"><span class="sw" style="background:#4da3ff"></span>Vehicle<b id="cVehicle">0</b></div>
   <div class="row"><span class="sw" style="background:#22d3a5"></span>Person<b id="cPerson">0</b></div>
   <div class="row"><span class="sw" style="background:#ffb454"></span>Truck / bus<b id="cTruck">0</b></div>
-  <div class="row"><span class="sw" style="background:#ff6bd6"></span>Bicycle<b id="cBicycle">0</b></div>
+  <div class="row"><span class="sw" style="background:#ff6bd6"></span>Bike / moto<b id="cBicycle">0</b></div>
 </div>
 <div id="adas">
   <div id="turn" hidden>↻</div>
@@ -210,13 +210,15 @@ function meshFor(v) {
   const geo = geoCache[key] || (geoCache[key] = KIND[k].geo(g));
   const m = new THREE.Mesh(geo, stateMat(v.state) || matFor(k));
   m.position.set(v.y, KIND[k].y(g), v.x);
-  // Tesla-style heading arrow on top: points the way this vehicle travels.
+  // Flat heading chevron lying on the roof: points the way this vehicle travels.
   const arrow = new THREE.Mesh(arrowGeo, arrowMat);
-  arrow.position.y = v.h / 2 + 0.55;
+  arrow.rotation.x = Math.PI / 2;          // cone +y axis → +z (forward)
+  arrow.scale.set(1, 1, 0.25);             // flatten so it hugs the roof
+  arrow.position.y = v.h / 2 + 0.05;
   m.add(arrow);
   return m;
 }
-const arrowGeo = new THREE.ConeGeometry(0.32, 0.85, 4);
+const arrowGeo = new THREE.ConeGeometry(0.28, 0.7, 3);
 const arrowMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 // Face each box along its own velocity so it reads as a vehicle, not a flat
 // rectangle. Travel direction in three.js coords is (x = vy, z = vx), so the
@@ -232,6 +234,10 @@ const trackMeshes = new Map();
 function syncObjects(f) {
   const seen = new Set();
   const counts = { vehicle: 0, person: 0, truck: 0, bicycle: 0 };
+  const group = k => (k === 'car' || k === 'vehicle') ? 'vehicle'
+                   : (k === 'truck' || k === 'bus') ? 'truck'
+                   : (k === 'bicycle' || k === 'motorcycle') ? 'bicycle'
+                   : k;
   for (const v of f.vehicles) {
     seen.add(v.id);
     let m = trackMeshes.get(v.id);
@@ -249,7 +255,7 @@ function syncObjects(f) {
       aimMesh(m, v);
       m.visible = true;
     }
-    counts[m.userData.kind]++;
+    counts[group(m.userData.kind)]++;
   }
   for (const [id, m] of trackMeshes) {
     if (!seen.has(id)) { objects.remove(m); trackMeshes.delete(id); }
@@ -398,27 +404,18 @@ function updateRoad(pathIn) {
   }
   roadGroup.add(new THREE.LineSegments(
     new THREE.BufferGeometry().setFromPoints(dashes), dashMat));
-  // Street furniture along the right edge: light poles and trees every 12 m,
-  // so the scene reads as a street, not a void.
   const poleMat = new THREE.MeshLambertMaterial({ color: 0x3a4356 });
   const lampMat = new THREE.MeshBasicMaterial({ color: 0xf4e6c0 });
-  const leafMat = new THREE.MeshLambertMaterial({ color: 0x2f7d4f });
-  const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5c4632 });
+  // Light poles along the verge every ~12 m, alternating sides — matching the
+  // freeway in the source video (no trees; it's a highway, not a street).
   for (let i = 2; i < path.length - 2; i += 3) {
     const [x, y] = path[i];
     const side = (i / 3) % 2 ? 1 : -1;         // alternate sides
     const z = y + side * (LANE_W + 1.2);
-    if ((i / 3) % 3 === 0) {                   // light pole with lamp head
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 6, 6), poleMat);
-      pole.position.set(z, 3, x); roadGroup.add(pole);
-      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.9), lampMat);
-      lamp.position.set(z - side * 0.4, 6, x); roadGroup.add(lamp);
-    } else {                                   // tree
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1.6, 6), trunkMat);
-      trunk.position.set(z, 0.8, x); roadGroup.add(trunk);
-      const crown = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.6, 7), leafMat);
-      crown.position.set(z, 2.9, x); roadGroup.add(crown);
-    }
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 6, 6), poleMat);
+    pole.position.set(z, 3, x); roadGroup.add(pole);
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.9), lampMat);
+    lamp.position.set(z - side * 0.4, 6, x); roadGroup.add(lamp);
   }
 }
 
