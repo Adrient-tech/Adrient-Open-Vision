@@ -3,9 +3,30 @@
 //  2. after reconnect with resume, the missed frames are replayed in order
 //  3. the server survives a client vanishing mid-stream
 //  4. server survives garbage messages
+// Self-contained: spawns its own broadcast server on a private port.
+import { spawn } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import WebSocket from 'ws';
 
-const url = 'ws://localhost:8081/live';
+const PORT = 8091;
+const url = `ws://localhost:${PORT}/live`;
+const serverDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+const server = spawn('node', ['live.mjs', '--port', String(PORT), '--replay',
+  path.join(serverDir, '..', 'viewer', 'scene.json')], { cwd: serverDir });
+server.stdout.on('data', () => {}); // drain
+server.stderr.on('data', d => console.error('server:', d.toString()));
+await new Promise((r, e) => {
+  const t = setTimeout(() => e(new Error('server did not start')), 5000);
+  const tryWs = () => {
+    const ws = new WebSocket(url);
+    ws.on('open', () => { ws.close(); clearTimeout(t); r(); });
+    ws.on('error', () => setTimeout(tryWs, 100));
+  };
+  setTimeout(tryWs, 150);
+});
+process.on('exit', () => server.kill());
 let results = [];
 const ok = (name, cond, detail = '') =>
   results.push(`${cond ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`);

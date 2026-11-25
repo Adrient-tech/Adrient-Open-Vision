@@ -1,14 +1,12 @@
 {
-  "name": "server",
+  "name": "adrient-openvision-live",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Adrient OpenVision realtime broadcast server (live@1 protocol)",
+  "main": "live.mjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node live.mjs --port 8081 --replay ../viewer/scene.json",
+    "test": "node test/live.test.mjs"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "type": "commonjs",
   "dependencies": {
     "ws": "^8.23.0"

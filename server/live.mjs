@@ -89,6 +89,22 @@ function broadcast(frame, { allowRewind = false } = {}) {
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json' };
 const server = http.createServer((req, res) => {
   const p = req.url === '/' ? '/index.html' : req.url.split('?')[0];
+  if (p === '/live') {
+    // Plain GET /live (no WebSocket upgrade): endpoint info page, not a 404.
+    res.writeHead(200, { 'content-type': 'text/html' });
+    res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>OpenVision live endpoint</title>
+<style>body{background:#0b0e14;color:#e8edf5;font:15px/1.5 system-ui,sans-serif;max-width:640px;margin:60px auto;padding:0 20px}
+code{background:#161c29;padding:2px 6px;border-radius:4px}</style></head><body>
+<h1>OpenVision live endpoint</h1>
+<p>This URL is a WebSocket endpoint, protocol <code>${PROTOCOL}</code>.
+The 3D viewer connects here automatically — open <a style="color:#4da3ff" href="/">the Live Instrument</a> and press <b>Go live</b>.</p>
+<p>To connect directly: <code>ws://host:${port}/live</code>.
+Messages: <code>hello</code>, <code>frame</code>, <code>ping</code> from the server;
+<code>resume {after}</code> and <code>pong</code> from the client.
+On reconnect send <code>{"type":"resume","after":&lt;last frame_id&gt;}</code> to replay what you missed.</p>
+</body></html>`);
+    return;
+  }
   const file = path.normalize(path.join(viewerDir, p));
   if (!file.startsWith(viewerDir) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
     res.writeHead(404).end('not found');
@@ -112,7 +128,7 @@ wss.on('connection', ws => {
     }
   });
   ws.send(JSON.stringify({ type: 'hello', protocol: PROTOCOL, fps }));
-  ws.send(JSON.stringify({ type: 'frame', frame: buffer[buffer.length - 1] ?? null }));
+  if (buffer.length) ws.send(JSON.stringify({ type: 'frame', frame: buffer[buffer.length - 1] }));
 });
 
 // heartbeat: drop clients that missed 2 pongs
