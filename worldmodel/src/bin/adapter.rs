@@ -1,4 +1,4 @@
-// OpenVision adapter — PRD Phase 2.
+// OpenVision adapter — normalises world-model output for the 3D viewer.
 //
 // Input : world_state.jsonl from the stage-2 world model (per-frame persistent
 //         tracks + ego pose + fitted path polynomial).
