@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace visionpilot::fusion {
+namespace openvision::fusion {
 
 // ─── Output struct ────────────────────────────────────────────────────────────
 //
@@ -194,4 +194,4 @@ private:
         );
 };
 
-}  // namespace visionpilot::fusion
+}  // namespace openvision::fusion

@@ -27,9 +27,9 @@
 #include <vehicle_ros2_interface/vehicle_ros2_interface.hpp>
 #endif
 
-namespace ve = visionpilot::engine;
-namespace vm = visionpilot::models;
-namespace vd = visionpilot::debug;
+namespace ve = openvision::engine;
+namespace vm = openvision::models;
+namespace vd = openvision::debug;
 
 int main(int argc, char** argv)
 {

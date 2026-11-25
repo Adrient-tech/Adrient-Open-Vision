@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <cstring>
 
-namespace visionpilot::models {
+namespace openvision::models {
 
 AutoSteer::AutoSteer(engine::OnnxEngine& engine, const std::string& model_path)
     : session_(engine.create_session(model_path, "autosteer_"))
@@ -79,4 +79,4 @@ AutoSteerOutput AutoSteer::infer(const float* image_chw)
     return out;
 }
 
-}  // namespace visionpilot::models
+}  // namespace openvision::models

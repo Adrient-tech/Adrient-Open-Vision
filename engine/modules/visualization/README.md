@@ -9,10 +9,10 @@ Your implementation was truly helpful and inspiring for me to complete this modu
 
 ## I. Overview
 
-The WebRTC Visualization Module provides a real-time video streaming capability for the VisionPilot pipeline via WebRTC protocol. It serves the following core functions:
+The WebRTC Visualization Module provides a real-time video streaming capability for the OpenVision pipeline via WebRTC protocol. It serves the following core functions:
 
 1. **Real-time frame capture and encoding** which accepts OpenCV `cv::Mat` frames and encodes them to VP8 video codec via GStreamer.
-2. **WebRTC peer-to-peer streaming** which establishes a WebRTC peer connection between the server (VisionPilot app) and browser clients, enabling live video delivery over the internet or LAN.
+2. **WebRTC peer-to-peer streaming** which establishes a WebRTC peer connection between the server (OpenVision app) and browser clients, enabling live video delivery over the internet or LAN.
 3. **Lightweight browser client** which serves a minimal, self-contained HTML5 page with built-in WebRTC JavaScript client without external dependencies required for the browser.
 4. Implements WebSocket-based signaling for SDP (Session Description Protocol) offer/answer negotiation and ICE (Interactive Connectivity Establishment) candidate exchange.
 5. **Thread-safe frame streaming** that manages concurrent frame pushes from the main application thread while running a GStreamer pipeline and event loop in separate threads.
@@ -26,7 +26,7 @@ This module is essential for downstream remote monitoring, debugging, and visual
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    VisionPilot Application                      │
+│                    OpenVision Application                      │
 │                  (vision_pilot.cpp main thread)                 │
 │                                                                 │
 │   DATA CAPTURE                                                  │
@@ -116,7 +116,7 @@ This module is essential for downstream remote monitoring, debugging, and visual
 
 ### 2. Flow summary
 
-1. `VisionPilot` application calls `webrtc_streamer->push_frame(cv::Mat)` in its main loop. This frame is generated from `visualization::render_frame()`.
+1. `OpenVision` application calls `webrtc_streamer->push_frame(cv::Mat)` in its main loop. This frame is generated from `visualization::render_frame()`.
 2. Frame is validated, converted to BGR, and pushed to the GStreamer pipeline's `appsrc` element.
 3. GStreamer encodes the frame using VP8 codec and feeds it to the `webrtcbin` element.
 4. On the first frame, `webrtcbin` triggers `on-negotiation-needed`, which creates an SDP offer.
@@ -205,7 +205,7 @@ sudo apt install -y \
 
 ```bash
 # 1. Navigate to workspace root
-cd /path/to/VisionPilot/development_releases/1.0
+cd /path/to/OpenVision/development_releases/1.0
 
 # 2. Source ROS2
 source /opt/ros/humble/setup.bash
@@ -220,12 +220,12 @@ make -j$(nproc)
 
 ```bash
 [ 83%] Built target visualization
-[ 89%] Building CXX object app/CMakeFiles/VisionPilot.dir/vision_pilot.cpp.o
-[ 97%] Linking CXX executable ../VisionPilot
-[100%] Built target VisionPilot
+[ 89%] Building CXX object app/CMakeFiles/OpenVision.dir/vision_pilot.cpp.o
+[ 97%] Linking CXX executable ../OpenVision
+[100%] Built target OpenVision
 ```
 
-Binary location: `build/VisionPilot`
+Binary location: `build/OpenVision`
 
 
 ## IV. Test/demo
@@ -237,11 +237,11 @@ via a combination of the `v4l2loopback` kernel module and FFmpeg.
 
 With this demo, you will:
 1. Publish a V4L2 video streaming mount from a local video.
-2. Use `VisionPilot` application to subscribe to that streaming mount, process and stream frames to a local host.
+2. Use `OpenVision` application to subscribe to that streaming mount, process and stream frames to a local host.
 
 ```bash
 # 1. Navigate to build directory
-cd /path/to/VisionPilot/development_releases/1.0/build
+cd /path/to/OpenVision/development_releases/1.0/build
 
 
 # 2. Initiate V4L2 streaming mount
@@ -259,8 +259,8 @@ sudo modprobe v4l2loopback video_nr=9 card_label="Virtual Camera" exclusive_caps
 ffmpeg -re -stream_loop -1 -i <absolute path to local video> -f v4l2 -pix_fmt yuv420p /dev/video9
 
 
-# 3. Kickstart VisionPilot app with V4L2 subscription to that mount, and stream frames to http://127.0.0.1:8080/
-./VisionPilot 1 /dev/video0 10 1 8080
+# 3. Kickstart OpenVision app with V4L2 subscription to that mount, and stream frames to http://127.0.0.1:8080/
+./OpenVision 1 /dev/video0 10 1 8080
 ```
 
 **Arguments:**
@@ -300,12 +300,12 @@ Local OpenCV preview is disabled while WebRTC is enabled.
 ### 3. Troubleshooting
 
 These are known/enountered bugs and errors. If you encounter a completely new one, try posting it as new issue
-at [Autoware VisionPilot repository](https://github.com/autowarefoundation/autoware_vision_pilot).
+at [Autoware OpenVision repository](https://github.com/autowarefoundation/autoware_vision_pilot).
 
 1. **Black/blank video**: frame may not be arriving from the camera. Test with WebRTC disabled:
   
     ```bash
-    ./VisionPilot 1 /dev/video0 10 0
+    ./OpenVision 1 /dev/video0 10 0
     ```
     
     If OpenCV preview works, the camera is fine, then the issue might be somewhat WebRTC-specific.
@@ -530,7 +530,7 @@ Candidates are queued until `remoteDescription` is set, then all flushed. This p
 In `start()` (lines ~576–606):
 
 ```cpp
-server = soup_server_new("server-header", "VisionPilot", NULL);
+server = soup_server_new("server-header", "OpenVision", NULL);
 soup_server_listen_local(server, config.port, SOUP_SERVER_LISTEN_IPV4_ONLY, &listen_error);
 soup_server_add_handler(server, "/", root_http_handler, this, nullptr);
 soup_server_add_websocket_handler(server, config.websocket_path.c_str(), ..., websocket_handler, ...);
@@ -584,7 +584,7 @@ soup_server_add_websocket_handler(server, config.websocket_path.c_str(), ..., we
 <!doctype html>
 <html>
   <head>
-    <title>VisionPilot</title>
+    <title>OpenVision</title>
     <style>/* Full-screen video */</style>
   </head>
   <body>

@@ -12,11 +12,11 @@
 #include <string>
 #include <filesystem>
 
-namespace visionpilot::engine {
+namespace openvision::engine {
 class OnnxEngine;
 }
 
-namespace visionpilot::models {
+namespace openvision::models {
 
 struct Config {
     std::string precision    = "fp32";
@@ -94,4 +94,4 @@ private:
     int     frame_buf_count_ = 0;
 };
 
-}  // namespace visionpilot::models
+}  // namespace openvision::models

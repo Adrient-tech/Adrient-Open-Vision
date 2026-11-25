@@ -1,5 +1,5 @@
-#ifndef VISIONPILOT_FILE_INTERFACE_HPP
-#define VISIONPILOT_FILE_INTERFACE_HPP
+#ifndef OPENVISION_FILE_INTERFACE_HPP
+#define OPENVISION_FILE_INTERFACE_HPP
 
 #include <string>
 #include <vector>
@@ -22,4 +22,4 @@ private:
     int frame_cnt_ = 0;
 };
 
-#endif //VISIONPILOT_FILE_INTERFACE_HPP
+#endif //OPENVISION_FILE_INTERFACE_HPP

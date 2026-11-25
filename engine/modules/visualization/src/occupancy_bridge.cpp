@@ -18,7 +18,7 @@ constexpr int kNetH = 512;
 }  // namespace
 
 Scene make_scene(
-  const visionpilot::models::InferenceFrameResult & r, const Plan & /*plan*/,
+  const openvision::models::InferenceFrameResult & r, const Plan & /*plan*/,
   const cv::Mat & H_resized)
 {
   Scene s;
@@ -87,14 +87,14 @@ Scene make_scene(
 }
 
 cv::Mat build_frame(
-  const visionpilot::models::InferenceFrameResult & result, const Plan & plan,
+  const openvision::models::InferenceFrameResult & result, const Plan & plan,
   const cv::Mat & H_resized)
 {
   return render(make_scene(result, plan, H_resized));
 }
 
 void publish(
-  VisualInterface * visual_interface, const visionpilot::models::InferenceFrameResult & result,
+  VisualInterface * visual_interface, const openvision::models::InferenceFrameResult & result,
   const Plan & plan, const cv::Mat & H_resized)
 {
   if (!visual_interface) return;

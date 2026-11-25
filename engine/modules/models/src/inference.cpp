@@ -11,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-namespace visionpilot::models {
+namespace openvision::models {
 
 namespace {
 
@@ -55,7 +55,7 @@ std::vector<float> chw_01(const cv::Mat& bgr)
 
 std::string find_model(const std::string& filename) {
     const std::string local  = "modules/models/weights/" + filename;
-    const std::string system = "/usr/share/visionpilot/modules/models/weights/" + filename;
+    const std::string system = "/usr/share/openvision/modules/models/weights/" + filename;
 
     if (std::filesystem::exists(local))  return local;
     if (std::filesystem::exists(system)) return system;
@@ -207,4 +207,4 @@ void InferencePipeline::reset()
     lat_fusion_.reset();
 }
 
-}  // namespace visionpilot::models
+}  // namespace openvision::models

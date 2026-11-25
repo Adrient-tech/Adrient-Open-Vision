@@ -16,17 +16,17 @@ namespace occupancy
 // Convert stock OpenVision pipeline outputs → Occupancy Scene.
 // This is the only place that knows about InferenceFrameResult / Plan.
 Scene make_scene(
-  const visionpilot::models::InferenceFrameResult & result, const Plan & plan,
+  const openvision::models::InferenceFrameResult & result, const Plan & plan,
   const cv::Mat & H_resized);
 
 // make_scene() + render().
 cv::Mat build_frame(
-  const visionpilot::models::InferenceFrameResult & result, const Plan & plan,
+  const openvision::models::InferenceFrameResult & result, const Plan & plan,
   const cv::Mat & H_resized);
 
 // One-line upstream hook: build panel and push to VisualInterface::set_aux_frame.
 void publish(
-  VisualInterface * visual_interface, const visionpilot::models::InferenceFrameResult & result,
+  VisualInterface * visual_interface, const openvision::models::InferenceFrameResult & result,
   const Plan & plan, const cv::Mat & H_resized);
 
 }  // namespace occupancy

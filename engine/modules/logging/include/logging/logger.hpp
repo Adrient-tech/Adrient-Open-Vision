@@ -15,19 +15,19 @@
 // When built without the SDK (ENABLE_RERUN off), every call is a cheap no-op.
 //
 // Usage:
-//   logging::Rerun::init("visionpilot.rrd");
+//   logging::Rerun::init("openvision.rrd");
 //   logging::Rerun::log_frame(frame_id, frame, warped, resized,
 //                             inference_result, plan, ego_speed_ms, viz_image);
 //   logging::Rerun::shutdown();
 
 namespace cv { class Mat; }
-namespace visionpilot { namespace models { struct InferenceFrameResult; } }
-namespace visionpilot { namespace models { struct AutoDriveOutput; } }
-namespace visionpilot { namespace models { struct AutoSteerOutput; } }
-namespace visionpilot { namespace models { struct AutoSpeedOutput; } }
-namespace visionpilot { namespace fusion { struct CIPOFusionEstimate; } }
-namespace visionpilot { namespace fusion { struct LateralFusionEstimate; } }
-namespace visionpilot { namespace planning { } }
+namespace openvision { namespace models { struct InferenceFrameResult; } }
+namespace openvision { namespace models { struct AutoDriveOutput; } }
+namespace openvision { namespace models { struct AutoSteerOutput; } }
+namespace openvision { namespace models { struct AutoSpeedOutput; } }
+namespace openvision { namespace fusion { struct CIPOFusionEstimate; } }
+namespace openvision { namespace fusion { struct LateralFusionEstimate; } }
+namespace openvision { namespace planning { } }
 
 struct Plan;
 
@@ -37,8 +37,8 @@ class Rerun {
 public:
 	// Open a Rerun recording that streams to `rrd_path` (created/truncated).
 	// `app_id` names application in the Rerun viewer.
-	static void init(const std::string& rrd_path = "visionpilot.rrd",
-					 const std::string& app_id   = "visionpilot");
+	static void init(const std::string& rrd_path = "openvision.rrd",
+					 const std::string& app_id   = "openvision");
 
 	// Log everything for a single frame in one call. 
 	// Timeline is set once, all entities share it.
@@ -53,7 +53,7 @@ public:
 						  const cv::Mat& frame,
 						  const cv::Mat& warped,
 						  const cv::Mat& resized,
-						  const visionpilot::models::InferenceFrameResult& r,
+						  const openvision::models::InferenceFrameResult& r,
 						  const Plan& plan,
 						  double ego_speed_ms,
 						  const cv::Mat& viz);

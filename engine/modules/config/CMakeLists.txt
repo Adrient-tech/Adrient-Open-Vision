@@ -15,7 +15,7 @@ endif()
 
 target_link_libraries(config
     PUBLIC
-    engine   # for visionpilot::engine::EngineConfig in OpenVisionConfig
+    engine   # for openvision::engine::EngineConfig in OpenVisionConfig
     models
 )
 

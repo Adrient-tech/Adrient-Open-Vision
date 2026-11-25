@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace visionpilot::models {
+namespace openvision::models {
 
 // ─── Output ───────────────────────────────────────────────────────────────────
 // Raw scalars straight from the model. Domain conversion is the caller's job:
@@ -55,4 +55,4 @@ private:
     std::string arena_shrink_;           // arena devices to shrink per run
 };
 
-}  // namespace visionpilot::models
+}  // namespace openvision::models

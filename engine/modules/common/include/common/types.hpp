@@ -1,5 +1,5 @@
-#ifndef VISIONPILOT_TYPES_HPP
-#define VISIONPILOT_TYPES_HPP
+#ifndef OPENVISION_TYPES_HPP
+#define OPENVISION_TYPES_HPP
 
 #include <cstdint>
 #include <vector>
@@ -18,4 +18,4 @@ struct Plan {
     std::vector<Warning>  warnings;
 };
 
-#endif //VISIONPILOT_TYPES_HPP
+#endif //OPENVISION_TYPES_HPP

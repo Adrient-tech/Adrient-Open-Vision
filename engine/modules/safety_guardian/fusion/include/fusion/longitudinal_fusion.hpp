@@ -7,7 +7,7 @@
 #include <random>
 #include <vector>
 
-namespace visionpilot::fusion {
+namespace openvision::fusion {
 
 // ─── Output ────────────────────────────────────────────────────────────────────
 struct CIPOFusionEstimate {
@@ -97,4 +97,4 @@ private:
          );
 };
 
-}  // namespace visionpilot::fusion
+}  // namespace openvision::fusion

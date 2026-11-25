@@ -1,5 +1,5 @@
-#ifndef VISIONPILOT_PLANNING_HPP
-#define VISIONPILOT_PLANNING_HPP
+#ifndef OPENVISION_PLANNING_HPP
+#define OPENVISION_PLANNING_HPP
 
 #include <utility>
 #include <vector>
@@ -53,4 +53,4 @@ private:
     bool   has_prev_kappa_ = false;
 };
 
-#endif //VISIONPILOT_PLANNING_HPP
+#endif //OPENVISION_PLANNING_HPP

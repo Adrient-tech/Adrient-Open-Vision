@@ -4,8 +4,8 @@
 #include <engine/onnx_engine.hpp>
 #include <models/inference.hpp>
 
-namespace vpe = visionpilot::engine;
-namespace vpm = visionpilot::models;
+namespace vpe = openvision::engine;
+namespace vpm = openvision::models;
 
 enum class SourceMode { Ros2 = 0, V4l2 = 1, Video = 2 };
 
@@ -49,7 +49,7 @@ struct Config {
     // Rerun logging: when enabled, per-frame data is streamed directly to an
     // .rrd recording ready to open in Rerun viewer.
     bool        rrd_on  = false;
-    std::string rrd_log = "visionpilot.rrd";
+    std::string rrd_log = "openvision.rrd";
 
     // World-model feed: per-frame perception state as JSONL for the offline
     // world-model builder (engine/worldmodel).
@@ -59,7 +59,7 @@ struct Config {
 
 static std::string find_config(const std::string& filename) {
     const std::string local  = "config/" + filename;
-    const std::string system = "/usr/share/visionpilot/config/" + filename;
+    const std::string system = "/usr/share/openvision/config/" + filename;
 
     if (std::filesystem::exists(local))  return local;
     if (std::filesystem::exists(system)) return system;

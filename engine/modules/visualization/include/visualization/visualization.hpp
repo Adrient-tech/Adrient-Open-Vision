@@ -58,7 +58,7 @@ struct ProductionView {
 
     // H_resized (resized-px → world) used to build H_world2px = inv(H_resized).
     static ProductionView from(
-        const visionpilot::models::InferenceFrameResult& result,
+        const openvision::models::InferenceFrameResult& result,
         const Plan& plan,
         double ego_speed_ms,
         const cv::Mat& H_resized = {},
@@ -71,7 +71,7 @@ struct ProductionView {
     // One-shot: from(result, plan, ego_v, H_resized) + render(frame).
     static cv::Mat visualize(
         cv::Mat& frame,
-        const visionpilot::models::InferenceFrameResult& result,
+        const openvision::models::InferenceFrameResult& result,
         const Plan& plan,
         double ego_speed_ms,
         const cv::Mat& H_resized = {},
@@ -101,7 +101,7 @@ public:
 
     std::unique_ptr<VisualInterface> visual_interface;
     cv::Mat build_frame(cv::Mat& frame,
-        const visionpilot::models::InferenceFrameResult& result,
+        const openvision::models::InferenceFrameResult& result,
         const Plan& plan,
         double ego_speed_ms,
         const cv::Mat& H_resized,

@@ -1,6 +1,6 @@
-// Stage 2 — persistent world model over VisionPilot perception feed.
+// Stage 2 — persistent world model over OpenVision perception feed.
 //
-// Input : perception.jsonl written by the VisionPilot app (one line per frame:
+// Input : perception.jsonl written by the OpenVision app (one line per frame:
 //         ego_v, fused CIPO, fitted path polynomial, detections in ego frame).
 // Output: world_state.jsonl (per-frame persistent tracks + ego pose + path)
 //         plus a summary on stdout.

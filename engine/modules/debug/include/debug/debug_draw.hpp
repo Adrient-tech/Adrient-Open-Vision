@@ -10,7 +10,7 @@
 
 #include <string>
 
-namespace visionpilot::debug {
+namespace openvision::debug {
 
 // Vehicle / AutoDrive defaults (match Models/visualizations/AutoDrive/image_visualization.py)
 struct VehicleParams {
@@ -76,4 +76,4 @@ bool visualize(cv::Mat& frame,
                const std::string& wheel_dir,
                const cv::Mat& H_world_to_px = {});
 
-}  // namespace visionpilot::debug
+}  // namespace openvision::debug

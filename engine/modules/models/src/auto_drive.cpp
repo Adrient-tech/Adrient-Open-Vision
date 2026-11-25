@@ -6,7 +6,7 @@
 #include <cmath>
 #include <cstdio>
 
-namespace visionpilot::models {
+namespace openvision::models {
 
 AutoDrive::AutoDrive(engine::OnnxEngine& engine, const std::string& model_path)
     : session_(engine.create_session(model_path, "autodrive_"))
@@ -78,4 +78,4 @@ AutoDriveOutput AutoDrive::infer(const float* prev_chw, const float* curr_chw)
     return out;
 }
 
-}  // namespace visionpilot::models
+}  // namespace openvision::models

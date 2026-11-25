@@ -1,5 +1,5 @@
-#ifndef VISIONPILOT_CAMERA_INTERFACE_HPP
-#define VISIONPILOT_CAMERA_INTERFACE_HPP
+#ifndef OPENVISION_CAMERA_INTERFACE_HPP
+#define OPENVISION_CAMERA_INTERFACE_HPP
 #include <string>
 #include <tuple>
 #include <vector>
@@ -31,4 +31,4 @@ public:
     virtual std::vector<std::string> get_overlay() const = 0;
 };
 
-#endif //VISIONPILOT_CAMERA_INTERFACE_HPP
+#endif //OPENVISION_CAMERA_INTERFACE_HPP

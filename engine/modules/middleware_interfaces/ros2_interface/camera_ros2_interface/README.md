@@ -44,7 +44,7 @@ ROS2ImageSubscriber (camera subscriber module)
 OpenCV cv::Mat stream
             ↓
             ↓
-VisionPilot pipeline (E2E models inference and other processing)
+OpenVision pipeline (E2E models inference and other processing)
 
 ```
 
@@ -80,7 +80,7 @@ camera_ros2_interface/
 ```bash
 
 # 1. From root to release directory
-cd VisionPilot/development_releases/1.0
+cd OpenVision/development_releases/1.0
 
 # 2. Create build dir
 mkdir -p build && cd build
@@ -100,9 +100,9 @@ make -j$(nproc)
 
 ```bash
 
-[ 97%] Building CXX object app/CMakeFiles/VisionPilot.dir/vision_pilot.cpp.o
-[100%] Linking CXX executable ../VisionPilot
-[100%] Built target VisionPilot
+[ 97%] Building CXX object app/CMakeFiles/OpenVision.dir/vision_pilot.cpp.o
+[100%] Linking CXX executable ../OpenVision
+[100%] Built target OpenVision
 
 ```
 
@@ -136,7 +136,7 @@ With this the topic `/camera/image` is now active and publishing frames from tha
 ```bash
 
 # 1. From root to auxiliaries directory
-cd VisionPilot/development_releases/auxiliaries
+cd OpenVision/development_releases/auxiliaries
 
 # 2. Create build dir
 mkdir -p build && cd build

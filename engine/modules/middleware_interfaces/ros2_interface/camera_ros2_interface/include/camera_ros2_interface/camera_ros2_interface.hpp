@@ -1,5 +1,5 @@
-#ifndef VISIONPILOT_ROS2_TO_OPENCV_HPP
-#define VISIONPILOT_ROS2_TO_OPENCV_HPP
+#ifndef OPENVISION_ROS2_TO_OPENCV_HPP
+#define OPENVISION_ROS2_TO_OPENCV_HPP
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -170,4 +170,4 @@ private:
     CaptureStats stats;
 };
 
-#endif //VISIONPILOT_ROS2_TO_OPENCV_HPP
+#endif //OPENVISION_ROS2_TO_OPENCV_HPP

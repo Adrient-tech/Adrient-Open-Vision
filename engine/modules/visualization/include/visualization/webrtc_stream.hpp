@@ -1,5 +1,5 @@
-#ifndef VISIONPILOT_VISUALIZATION_TO_WEBRTC_H
-#define VISIONPILOT_VISUALIZATION_TO_WEBRTC_H
+#ifndef OPENVISION_VISUALIZATION_TO_WEBRTC_H
+#define OPENVISION_VISUALIZATION_TO_WEBRTC_H
 
 #include <opencv2/opencv.hpp>
 #include <cstdint>
@@ -147,4 +147,4 @@ namespace visualization {
 };  // namespace visualization
 
 
-#endif //VISIONPILOT_VISUALIZATION_TO_WEBRTC_H
+#endif //OPENVISION_VISUALIZATION_TO_WEBRTC_H

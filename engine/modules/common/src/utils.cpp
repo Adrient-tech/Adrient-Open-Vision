@@ -3,7 +3,7 @@
 std::string find_config(const std::string& filename)
 {
     const std::string local = "config/" + filename;
-    const std::string system = "/usr/share/visionpilot/config/" + filename;
+    const std::string system = "/usr/share/openvision/config/" + filename;
 
     if (std::filesystem::exists(local)) return local;
     if (std::filesystem::exists(system)) return system;

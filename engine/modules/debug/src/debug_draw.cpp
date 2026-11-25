@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-namespace visionpilot::debug {
+namespace openvision::debug {
 
 namespace fs = std::filesystem;
 
@@ -608,4 +608,4 @@ bool visualize(cv::Mat& frame,
     return true;
 }
 
-}  // namespace visionpilot::debug
+}  // namespace openvision::debug

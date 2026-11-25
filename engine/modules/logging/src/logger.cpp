@@ -56,7 +56,7 @@ void log_images(const cv::Mat& frame, const cv::Mat& warped, const cv::Mat& resi
 	log_image_inplace("images/cropped",    resized, scratch);   // cropped+resized (AutoSteer/AutoSpeed)
 }
 
-void log_inference(const visionpilot::models::InferenceFrameResult& r) {
+void log_inference(const openvision::models::InferenceFrameResult& r) {
 	// AutoDrive raw predictions
 	log_scalar("inference/auto_drive/dist_normalized", r.auto_drive.dist_normalized);
 	log_scalar("inference/auto_drive/curvature_raw",   r.auto_drive.curvature_raw);
@@ -184,7 +184,7 @@ void Rerun::log_frame(uint64_t frame_id,
 					  const cv::Mat& frame,
 					  const cv::Mat& warped,
 					  const cv::Mat& resized,
-					  const visionpilot::models::InferenceFrameResult& r,
+					  const openvision::models::InferenceFrameResult& r,
 					  const Plan& plan,
 					  double ego_speed_ms,
 					  const cv::Mat& viz) {
@@ -213,7 +213,7 @@ void Rerun::shutdown() {
 
 void Rerun::init(const std::string&, const std::string&) {}
 void Rerun::log_frame(uint64_t, const cv::Mat&, const cv::Mat&, const cv::Mat&,
-					  const visionpilot::models::InferenceFrameResult&, const Plan&,
+					  const openvision::models::InferenceFrameResult&, const Plan&,
 					  double, const cv::Mat&) {}
 void Rerun::shutdown() {}
 

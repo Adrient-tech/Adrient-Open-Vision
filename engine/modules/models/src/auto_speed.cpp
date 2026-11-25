@@ -6,7 +6,7 @@
 #include <cmath>
 #include <cstdio>
 
-namespace visionpilot::models {
+namespace openvision::models {
 
 // ─── Constructor ─────────────────────────────────────────────────────────────
 
@@ -170,4 +170,4 @@ std::vector<Detection> AutoSpeed::nms(
     return keep;
 }
 
-}  // namespace visionpilot::models
+}  // namespace openvision::models

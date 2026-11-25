@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace visionpilot::models {
+namespace openvision::models {
 
 // ─── Output ───────────────────────────────────────────────────────────────────
 // Bounding boxes in model-input pixel space (1024 × 512) after NMS.
@@ -73,4 +73,4 @@ private:
     std::string arena_shrink_;
 };
 
-}  // namespace visionpilot::models
+}  // namespace openvision::models

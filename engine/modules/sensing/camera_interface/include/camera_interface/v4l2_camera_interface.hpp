@@ -1,5 +1,5 @@
-#ifndef VISIONPILOT_V4L2_TO_OPENCV_HPP
-#define VISIONPILOT_V4L2_TO_OPENCV_HPP
+#ifndef OPENVISION_V4L2_TO_OPENCV_HPP
+#define OPENVISION_V4L2_TO_OPENCV_HPP
 
 #include <opencv2/opencv.hpp>
 #include <cstdint>
@@ -151,4 +151,4 @@ namespace camera_interface {
 
 };  // namespace v4l2_interface
 
-#endif //VISIONPILOT_V4L2_TO_OPENCV_HPP
+#endif //OPENVISION_V4L2_TO_OPENCV_HPP

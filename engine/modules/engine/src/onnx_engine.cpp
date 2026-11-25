@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace visionpilot::engine {
+namespace openvision::engine {
 
 OnnxEngine::OnnxEngine(const Config& cfg)
     : env_(ORT_LOGGING_LEVEL_WARNING, "OpenVision")
@@ -138,4 +138,4 @@ std::unique_ptr<Ort::Session> OnnxEngine::create_tensorrt_session(
     return std::make_unique<Ort::Session>(env_, model_path.c_str(), opts);
 }
 
-}  // namespace visionpilot::engine
+}  // namespace openvision::engine

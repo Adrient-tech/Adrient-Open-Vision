@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace visionpilot::models {
+namespace openvision::models {
 
 // ─── Output ───────────────────────────────────────────────────────────────────
 // Both tensors are (1, 64) in the ONNX model, flattened here:
@@ -52,4 +52,4 @@ private:
     std::string arena_shrink_;
 };
 
-}  // namespace visionpilot::models
+}  // namespace openvision::models

@@ -4,7 +4,7 @@ add_executable(OpenVision
 
 set_target_properties(OpenVision PROPERTIES
         BUILD_RPATH "${ONNXRUNTIME_ROOT}/lib"
-        INSTALL_RPATH "/usr/share/visionpilot/onnxruntime/lib"
+        INSTALL_RPATH "/usr/share/openvision/onnxruntime/lib"
         BUILD_WITH_INSTALL_RPATH FALSE
 )
 
@@ -58,20 +58,20 @@ if(ENABLE_ROS2_INTERFACE)
 endif()
 
 install(FILES ${OPENVISION_CONF_FILES}
-        DESTINATION share/visionpilot/config/
+        DESTINATION share/openvision/config/
 )
 
 install(DIRECTORY "${CMAKE_SOURCE_DIR}/assets/icons/"
-        DESTINATION "share/visionpilot/assets/icons"
+        DESTINATION "share/openvision/assets/icons"
 )
 
 install(DIRECTORY "${CMAKE_SOURCE_DIR}/modules/models/weights/"
-        DESTINATION "share/visionpilot/modules/models/weights"
+        DESTINATION "share/openvision/modules/models/weights"
         FILES_MATCHING
         PATTERN "*.onnx"
         PATTERN "trt_cache" EXCLUDE
 )
 
 install(DIRECTORY "${CMAKE_SOURCE_DIR}/onnxruntime/"
-        DESTINATION "share/visionpilot/onnxruntime"
+        DESTINATION "share/openvision/onnxruntime"
 )

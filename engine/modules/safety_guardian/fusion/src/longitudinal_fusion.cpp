@@ -8,7 +8,7 @@
 #include <sstream>
 #include <stdexcept>
 
-namespace visionpilot::fusion {
+namespace openvision::fusion {
 
 // ─── Construction ─────────────────────────────────────────────────────────────
 
@@ -309,4 +309,4 @@ void LongitudinalFusion::resample()
     particles_ = std::move(np);
 }
 
-}  // namespace visionpilot::fusion
+}  // namespace openvision::fusion

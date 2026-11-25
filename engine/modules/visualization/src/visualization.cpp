@@ -118,7 +118,7 @@ static std::string resolve_icons_dir(const std::string & hint)
   if (!hint.empty() && fs::is_directory(hint)) return hint;
   for (const char * c :
        {"../assets/icons", "assets/icons", "OpenVision/assets/icons",
-        "/usr/share/visionpilot/assets/icons"}) {
+        "/usr/share/openvision/assets/icons"}) {
     if (fs::is_directory(c)) return std::string(c);
   }
   return {};
@@ -552,7 +552,7 @@ static cv::Mat draw_production_frame(cv::Mat & frame, const ProductionView & vie
 // ─── ProductionView ──────────────────────────────────────────────────────────
 
 ProductionView ProductionView::from(
-  const visionpilot::models::InferenceFrameResult & r, const Plan & plan, double ego_speed_ms,
+  const openvision::models::InferenceFrameResult & r, const Plan & plan, double ego_speed_ms,
   const cv::Mat & H_resized, double speed_limit_ms)
 {
   ProductionView pv;
@@ -608,7 +608,7 @@ cv::Mat ProductionView::render(cv::Mat & frame) const
 }
 
 cv::Mat ProductionView::visualize(
-  cv::Mat & frame, const visionpilot::models::InferenceFrameResult & result, const Plan & plan,
+  cv::Mat & frame, const openvision::models::InferenceFrameResult & result, const Plan & plan,
   double ego_speed_ms, const cv::Mat & H_resized, double speed_limit_ms)
 {
   return from(result, plan, ego_speed_ms, H_resized, speed_limit_ms).render(frame);
@@ -643,7 +643,7 @@ Visualization::Visualization(Config cfg)
 }
 
 cv::Mat Visualization::build_frame(
-  cv::Mat & frame, const visionpilot::models::InferenceFrameResult & result, const Plan & plan,
+  cv::Mat & frame, const openvision::models::InferenceFrameResult & result, const Plan & plan,
   double ego_speed_ms, const cv::Mat & H_resized, double speed_limit_ms)
 {
   cv::Mat out =

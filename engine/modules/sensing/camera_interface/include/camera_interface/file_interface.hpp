@@ -1,5 +1,5 @@
-#ifndef VISIONPILOT_VIDEO_FILE_INTERFACE_HPP
-#define VISIONPILOT_VIDEO_FILE_INTERFACE_HPP
+#ifndef OPENVISION_VIDEO_FILE_INTERFACE_HPP
+#define OPENVISION_VIDEO_FILE_INTERFACE_HPP
 
 #include <camera_interface/camera_interface.hpp>
 #include <chrono>
@@ -26,4 +26,4 @@ private:
 
 }  // namespace camera_interface
 
-#endif  // VISIONPILOT_VIDEO_FILE_INTERFACE_HPP
+#endif  // OPENVISION_VIDEO_FILE_INTERFACE_HPP

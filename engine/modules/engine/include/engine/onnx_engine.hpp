@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-namespace visionpilot::engine {
+namespace openvision::engine {
 
 // Configuration that governs how the engine creates sessions.
 // One EngineConfig instance is typically shared across all models in main().
@@ -15,7 +15,7 @@ struct Config {
 
     // Used only when provider == "tensorrt"
     std::string precision    = "fp32";   // "fp32" | "fp16"
-    std::string cache_dir    = "/tmp/visionpilot_trt_cache";
+    std::string cache_dir    = "/tmp/openvision_trt_cache";
     double      workspace_gb = 1.0;
 
     // GPU device index (cuda and tensorrt)
@@ -58,4 +58,4 @@ private:
     Config     cfg_;
 };
 
-}  // namespace visionpilot::engine
+}  // namespace openvision::engine

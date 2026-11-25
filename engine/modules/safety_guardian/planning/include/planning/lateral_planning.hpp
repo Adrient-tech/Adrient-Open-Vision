@@ -1,5 +1,5 @@
-#ifndef VISIONPILOT_LATERAL_HPP
-#define VISIONPILOT_LATERAL_HPP
+#ifndef OPENVISION_LATERAL_HPP
+#define OPENVISION_LATERAL_HPP
 
 #include <vector>
 #include <Eigen/Core>
@@ -31,4 +31,4 @@ public:
                                         const Eigen::VectorXd& kappa_schedule);
 };
 
-#endif //VISIONPILOT_LATERAL_HPP
+#endif //OPENVISION_LATERAL_HPP

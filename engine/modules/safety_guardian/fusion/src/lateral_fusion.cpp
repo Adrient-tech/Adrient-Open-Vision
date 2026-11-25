@@ -8,7 +8,7 @@
 #include <sstream>
 #include <stdexcept>
 
-namespace visionpilot::fusion {
+namespace openvision::fusion {
 
 // ─── Construction / reset ────────────────────────────────────────────────────
 
@@ -489,4 +489,4 @@ void LateralFusion::systematic_resample(std::vector<P>& particles)
     particles = std::move(np);
 }
 
-}  // namespace visionpilot::fusion
+}  // namespace openvision::fusion

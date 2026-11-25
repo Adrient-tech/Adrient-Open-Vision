@@ -1,5 +1,5 @@
-#ifndef VISIONPILOT_UTILS_HPP
-#define VISIONPILOT_UTILS_HPP
+#ifndef OPENVISION_UTILS_HPP
+#define OPENVISION_UTILS_HPP
 
 #include <algorithm>
 #include <cmath>
@@ -18,4 +18,4 @@ inline int compute_top_crop_2_1(int height, int width)
         static_cast<double>(height) - static_cast<double>(width) / 2.0)));
 }
 
-#endif //VISIONPILOT_UTILS_HPP
+#endif //OPENVISION_UTILS_HPP

@@ -1,5 +1,5 @@
-#ifndef VISIONPILOT_VEHICLE_ROS2_INTERFACE_HPP
-#define VISIONPILOT_VEHICLE_ROS2_INTERFACE_HPP
+#ifndef OPENVISION_VEHICLE_ROS2_INTERFACE_HPP
+#define OPENVISION_VEHICLE_ROS2_INTERFACE_HPP
 
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float64.hpp>
@@ -56,4 +56,4 @@ private:
     std::atomic<double> speed_{0.0};
 };
 
-#endif //VISIONPILOT_VEHICLE_ROS2_INTERFACE_HPP
+#endif //OPENVISION_VEHICLE_ROS2_INTERFACE_HPP

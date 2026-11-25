@@ -117,7 +117,7 @@ Config load_openvision_config()
     cfg.engine.provider     = optional(kv, "engine.provider",     "cpu");
     cfg.engine.precision    = optional(kv, "model.precision",    "fp32");
     cfg.engine.device_id    = parse_int(optional(kv, "engine.device_id", "0"), "engine.device_id");
-    cfg.engine.cache_dir    = expand_home(optional(kv, "engine.cache_dir", "/tmp/visionpilot_trt_cache"));
+    cfg.engine.cache_dir    = expand_home(optional(kv, "engine.cache_dir", "/tmp/openvision_trt_cache"));
     cfg.engine.workspace_gb = parse_double(optional(kv, "engine.workspace_gb", "1.0"), "engine.workspace_gb");
 
     cfg.inference.precision    = optional(kv, "model.precision",    "fp32");
@@ -143,7 +143,7 @@ Config load_openvision_config()
     cfg.webrtc_port =  parse_int(optional(kv, "webrtc_port", "8080"), "webrtc_port");
 
     cfg.rrd_on  = parse_bool(optional(kv, "rrd_on", "false"), "rrd_on");
-    cfg.rrd_log = optional(kv, "rrd_log", "visionpilot.rrd");
+    cfg.rrd_log = optional(kv, "rrd_log", "openvision.rrd");
 
     cfg.world_log_on  = parse_bool(optional(kv, "world_log_on", "false"), "world_log_on");
     cfg.world_log_path = optional(kv, "world_log_path", "perception.jsonl");

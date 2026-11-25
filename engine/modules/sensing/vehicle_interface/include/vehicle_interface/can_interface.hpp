@@ -1,5 +1,5 @@
-#ifndef VISIONPILOT_CAN_INTERFACE_HPP
-#define VISIONPILOT_CAN_INTERFACE_HPP
+#ifndef OPENVISION_CAN_INTERFACE_HPP
+#define OPENVISION_CAN_INTERFACE_HPP
 
 #include <vehicle_interface/vehicle_interface.hpp>
 
@@ -16,4 +16,4 @@ public:
     void write(double steering, double acceleration) override;
 };
 
-#endif //VISIONPILOT_CAN_INTERFACE_HPP
+#endif //OPENVISION_CAN_INTERFACE_HPP

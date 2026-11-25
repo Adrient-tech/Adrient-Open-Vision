@@ -4,7 +4,7 @@
 
 This **V4L2 Interface** module provides a robust C++ wrapper for capturing video frames from V4L2 (Video4Linux2) camera devices and converting them to OpenCV `cv::Mat` format. 
 
-This module is essential for low-level camera frame acquisition in VisionPilot 1.0, featuring:
+This module is essential for low-level camera frame acquisition in OpenVision 1.0, featuring:
 
 - V4L2 camera capturing whose interface directly connects to V4L2 mounted devices (`/dev/video0`, `/dev/video1`, etc.)
 - Seamless conversion to OpenCV `cv::Mat` for downstream processing
@@ -54,7 +54,7 @@ This uses OpenCV's VideoCapture with the CAP_V4L2 backend for direct V4L2 device
                    │
                    ▼
 ┌─────────────────────────────────────────┐
-│   VisionPilot Application Layer          │
+│   OpenVision Application Layer          │
 └─────────────────────────────────────────┘
 
 ```
@@ -88,7 +88,7 @@ v4l2_interface/
 ```bash
 
 # 1. From root to release directory
-cd VisionPilot/development_releases/1.0
+cd OpenVision/development_releases/1.0
 
 # 2. Create build dir
 mkdir -p build && cd build
@@ -108,9 +108,9 @@ make -j$(nproc)
 
 ```bash
 
-[ 97%] Building CXX object app/CMakeFiles/VisionPilot.dir/vision_pilot.cpp.o
-[100%] Linking CXX executable ../VisionPilot
-[100%] Built target VisionPilot
+[ 97%] Building CXX object app/CMakeFiles/OpenVision.dir/vision_pilot.cpp.o
+[100%] Linking CXX executable ../OpenVision
+[100%] Built target OpenVision
 
 ```
 
@@ -146,13 +146,13 @@ ffplay /dev/video9
 
 ```
 
-2. Then, on another terminal (or back to the terminal that you built VisionPilot), we can test it inside the main VisionPilot loop:
+2. Then, on another terminal (or back to the terminal that you built OpenVision), we can test it inside the main OpenVision loop:
 
 ```bash
 
 # First argument `1` means starting this with V4L2 input
 # Second argument being mounted V4L2 stream
 # Third argument being desired FPS
-./VisionPilot 1 /dev/video9 10
+./OpenVision 1 /dev/video9 10
 
 ```
