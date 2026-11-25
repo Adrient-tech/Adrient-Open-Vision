@@ -29,8 +29,10 @@
   #leadCard.risk { color:var(--bad); font-weight:600; animation:flash 0.6s steps(2) infinite; }
   @keyframes flash { 50% { opacity:0.35; } }
   /* Tesla-style speed arc */
+  /* Tesla-style drive card: rounded dark card holding the speed arc. */
   #dial { position:fixed; left:50%; transform:translateX(-50%); bottom:64px; z-index:10; width:190px;
-          pointer-events:none; }
+          pointer-events:none; background:var(--panel); border:1px solid var(--line);
+          border-radius:18px; padding:10px 8px 6px; backdrop-filter:blur(6px); }
   #dial .kmh { font-size:34px; font-weight:700; text-anchor:middle; fill:var(--text); font-variant-numeric:tabular-nums; }
   #dial .unit { font-size:11px; letter-spacing:2px; text-anchor:middle; fill:var(--dim); }
   #legend { position:fixed; top:52px; right:16px; z-index:10; background:var(--panel); border:1px solid var(--line);
@@ -100,6 +102,7 @@
     <option value="chase">Chase</option>
     <option value="orbit">Orbit</option>
     <option value="top">Top</option>
+    <option value="bev">BEV</option>
   </select>
   <button id="liveBtn">Go live</button>
   <input id="scrub" type="range" min="0" max="0" value="0" step="1">
@@ -181,14 +184,16 @@ loader.load('assets/car.glb', g => {
 
 // Class-aware materials and geometry factories (footprints come from the scene
 // file: w = width (y), l = length (x), h = height).
+// Boxes are built length-along-z because scene forward (+x world) maps to
+// three.js +z (see position mapping in meshFor / ego placement).
 const KIND = {
-  vehicle:    { color: 0x4da3ff, geo: g => new THREE.BoxGeometry(g.l, g.h, g.w), y: g => g.h / 2 },
-  car:        { color: 0x4da3ff, geo: g => new THREE.BoxGeometry(g.l, g.h, g.w), y: g => g.h / 2 },
+  vehicle:    { color: 0x4da3ff, geo: g => new THREE.BoxGeometry(g.w, g.h, g.l), y: g => g.h / 2 },
+  car:        { color: 0x4da3ff, geo: g => new THREE.BoxGeometry(g.w, g.h, g.l), y: g => g.h / 2 },
   person:     { color: 0x22d3a5, geo: g => new THREE.CapsuleGeometry(g.w / 2, Math.max(0.1, g.h - g.w), 4, 10), y: g => g.h / 2 },
-  truck:      { color: 0xffb454, geo: g => new THREE.BoxGeometry(g.l, g.h, g.w), y: g => g.h / 2 },
-  bus:        { color: 0xffd166, geo: g => new THREE.BoxGeometry(g.l, g.h, g.w), y: g => g.h / 2 },
-  motorcycle: { color: 0xff8f6b, geo: g => new THREE.BoxGeometry(g.l, g.h, g.w), y: g => g.h / 2 },
-  bicycle:    { color: 0xff6bd6, geo: g => new THREE.BoxGeometry(g.l, g.h * 0.7, g.w), y: g => g.h * 0.35 },
+  truck:      { color: 0xffb454, geo: g => new THREE.BoxGeometry(g.w, g.h, g.l), y: g => g.h / 2 },
+  bus:        { color: 0xffd166, geo: g => new THREE.BoxGeometry(g.w, g.h, g.l), y: g => g.h / 2 },
+  motorcycle: { color: 0xff8f6b, geo: g => new THREE.BoxGeometry(g.w, g.h, g.l), y: g => g.h / 2 },
+  bicycle:    { color: 0xff6bd6, geo: g => new THREE.BoxGeometry(g.w, g.h * 0.7, g.l), y: g => g.h * 0.35 },
 };
 const kindMat = k => new THREE.MeshLambertMaterial({ color: KIND[k]?.color ?? 0x4da3ff,
                       transparent: true, opacity: k === 'vehicle' ? 1 : 0.95 });
@@ -205,13 +210,20 @@ function meshFor(v) {
   const geo = geoCache[key] || (geoCache[key] = KIND[k].geo(g));
   const m = new THREE.Mesh(geo, stateMat(v.state) || matFor(k));
   m.position.set(v.y, KIND[k].y(g), v.x);
+  // Tesla-style heading arrow on top: points the way this vehicle travels.
+  const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+  arrow.position.y = v.h / 2 + 0.55;
+  m.add(arrow);
   return m;
 }
+const arrowGeo = new THREE.ConeGeometry(0.32, 0.85, 4);
+const arrowMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 // Face each box along its own velocity so it reads as a vehicle, not a flat
-// rectangle; persons are rotation-symmetric so skip them.
+// rectangle. Travel direction in three.js coords is (x = vy, z = vx), so the
+// yaw that turns +z onto it is atan2(vy, vx). Persons are symmetric — skip.
 function aimMesh(m, v) {
   if (m.userData.kind !== 'person' && (Math.abs(v.vx) + Math.abs(v.vy)) > 0.3)
-    m.rotation.y = Math.atan2(v.vx, v.vy);
+    m.rotation.y = Math.atan2(v.vy, v.vx);
 }
 
 // ── Persistent track meshes: one mesh per track id, updated in place so the
@@ -323,6 +335,33 @@ const roadGroup = new THREE.Group(); scene.add(roadGroup);
 const roadMat = new THREE.MeshBasicMaterial({ color: 0x11151d, transparent: true, opacity: 0.94, depthWrite: false });
 const edgeMat = new THREE.LineBasicMaterial({ color: 0xd8e2f2 });
 const dashMat  = new THREE.LineBasicMaterial({ color: 0xf4c542 });
+// Smooth the fitted path: the quadratic lane fit wiggles frame to frame, so a
+// moving average (window 5) keeps the road steady under the vehicles.
+function smoothPath(path) {
+  if (!path || path.length < 5) return path;
+  const W = 2, out = [];
+  for (let i = 0; i < path.length; i++) {
+    let sx = 0, sy = 0, n = 0;
+    for (let j = Math.max(0, i - W); j <= Math.min(path.length - 1, i + W); j++) {
+      sx += path[j][0]; sy += path[j][1]; n++;
+    }
+    out.push([sx / n, sy / n]);
+  }
+  return out;
+}
+// Heading (yaw around +z-forward) of the smoothed path at longitudinal x.
+function pathHeadingAt(path, x) {
+  const p = smoothPath(path);
+  if (!p || p.length < 2) return 0;
+  for (let i = 1; i < p.length; i++) {
+    if (p[i][0] >= x) {
+      const [x0, y0] = p[i - 1], [x1, y1] = p[i];
+      return Math.atan2(y1 - y0, x1 - x0);
+    }
+  }
+  const [xa, ya] = p[p.length - 2], [xb, yb] = p[p.length - 1];
+  return Math.atan2(yb - ya, xb - xa);
+}
 function ribbon(pts, half, y) {
   // Triangulated ribbon: for each path point, two vertices at (y ± half).
   const pos = [], idxArr = [];
@@ -338,8 +377,9 @@ function ribbon(pts, half, y) {
   g.setIndex(idxArr);
   return g;
 }
-function updateRoad(path) {
+function updateRoad(pathIn) {
   roadGroup.clear();
+  const path = smoothPath(pathIn);
   if (!path || path.length < 2) return;
   // Asphalt: one lane either side of our centreline.
   const asphalt = new THREE.Mesh(ribbon(path, LANE_W, 0.02), roadMat);
@@ -358,6 +398,28 @@ function updateRoad(path) {
   }
   roadGroup.add(new THREE.LineSegments(
     new THREE.BufferGeometry().setFromPoints(dashes), dashMat));
+  // Street furniture along the right edge: light poles and trees every 12 m,
+  // so the scene reads as a street, not a void.
+  const poleMat = new THREE.MeshLambertMaterial({ color: 0x3a4356 });
+  const lampMat = new THREE.MeshBasicMaterial({ color: 0xf4e6c0 });
+  const leafMat = new THREE.MeshLambertMaterial({ color: 0x2f7d4f });
+  const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5c4632 });
+  for (let i = 2; i < path.length - 2; i += 3) {
+    const [x, y] = path[i];
+    const side = (i / 3) % 2 ? 1 : -1;         // alternate sides
+    const z = y + side * (LANE_W + 1.2);
+    if ((i / 3) % 3 === 0) {                   // light pole with lamp head
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 6, 6), poleMat);
+      pole.position.set(z, 3, x); roadGroup.add(pole);
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.9), lampMat);
+      lamp.position.set(z - side * 0.4, 6, x); roadGroup.add(lamp);
+    } else {                                   // tree
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1.6, 6), trunkMat);
+      trunk.position.set(z, 0.8, x); roadGroup.add(trunk);
+      const crown = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.6, 7), leafMat);
+      crown.position.set(z, 2.9, x); roadGroup.add(crown);
+    }
+  }
 }
 
 // ── ADAS: turn indicator from path curvature, forward-collision and
@@ -410,13 +472,17 @@ function show(i) {
   $('cTruck').textContent = counts.truck;
   $('cBicycle').textContent = counts.bicycle;
 
-  pathLine.geometry.setFromPoints(f.path.map(([x, y]) => new THREE.Vector3(y, 0.05, x)));
+  pathLine.geometry.setFromPoints(
+    smoothPath(f.path).map(([x, y]) => new THREE.Vector3(y, 0.05, x)));
   updateRoad(f.path);
   updateAdas(f);
 
-  // Ego car follows the tracked ego pose; heading from ego motion direction.
+  // Ego car follows the tracked ego pose. Heading comes from the lane path at
+  // the ego's own position, so a real turn yaws the model (and the camera
+  // target rides the same forward point).
   egoGroup.position.set(0, 0, f.ego.x);
-  egoGroup.rotation.y = Math.PI; // model front faces +x (forward)
+  const heading = pathHeadingAt(f.path, f.ego.x);
+  egoGroup.rotation.y = heading; // model front faces +z (scene forward)
 
   // Camera follows the ego forward position in chase/orbit views.
   cam.targetX = f.ego.x;
@@ -510,6 +576,7 @@ $('scrub').oninput = e => { playing = false; $('play').textContent = 'Play'; liv
 $('view').onchange = e => {
   const v = e.target.value;
   if (v === 'top') { cam.phi = 0.2; cam.r = 60; }
+  else if (v === 'bev') { cam.phi = 0.03; cam.r = 55; }   // near-orthographic bird's-eye
   else if (v === 'chase') { cam.phi = 1.05; cam.theta = Math.PI; cam.r = 26; }
   else { cam.phi = 0.7; cam.theta = Math.PI * 0.75; cam.r = 34; }
 };
