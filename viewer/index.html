@@ -53,6 +53,8 @@
   #bar select { appearance:auto; }
   #liveBtn { background:#1d2636; color:var(--text); border:1px solid var(--line); }
   #liveBtn.on { background:var(--bad); color:#fff; }
+  #reconBtn { background:#1d2636; color:var(--text); border:1px solid var(--line); }
+  #reconBtn.on { background:var(--good); color:#04101f; }
   #bar input { flex:1; accent-color:var(--accent); min-width:60px; }
   #frameLabel { color:var(--dim); min-width:110px; text-align:right; font-variant-numeric:tabular-nums; }
   #hint { position:fixed; bottom:64px; right:16px; z-index:9; color:var(--dim); font-size:11px; text-align:right; }
@@ -105,6 +107,7 @@
     <option value="bev">BEV</option>
   </select>
   <button id="liveBtn">Go live</button>
+  <button id="reconBtn" disabled>Reconstruction: loading…</button>
   <input id="scrub" type="range" min="0" max="0" value="0" step="1">
   <span id="frameLabel">frame –</span>
 </div>
@@ -141,6 +144,48 @@ const pathLine = new THREE.Line(
   new THREE.LineBasicMaterial({ color: 0x4da3ff })
 );
 scene.add(pathLine);
+
+// ── 3D reconstruction layer: the camera images converted into actual geometry
+// (MiDaS depth back-projected and fused across frames — the same world space
+// the tracked boxes live in). Loaded from assets/reconstruction.bin, a flat
+// interleaved buffer of float32 x,y,z + uint8 r,g,b per point, produced by
+// scripts/reconstruct3d.py. Rendered as coloured points; the wireframe grid is
+// hidden while it is on, because the real road replaces it.
+const gridHelper = scene.children.find(o => o.isGridHelper);
+const reconGroup = new THREE.Group(); reconGroup.visible = false; scene.add(reconGroup);
+fetch('assets/reconstruction.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(hdr => fetch('assets/reconstruction.bin')
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+    .then(buf => {
+      const n = hdr.count;
+      // Records are 16 bytes: float32 x,y,z, uint8 r,g,b, 1 pad — decode with
+      // a stride so the colour bytes never land inside a float.
+      const rec = hdr.point_bytes / 4; // 4 float32 slots per record
+      const raw = new Float32Array(buf, 0, n * rec);
+      const xyz = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) {
+        xyz[i * 3] = raw[i * rec];
+        xyz[i * 3 + 1] = raw[i * rec + 1];
+        xyz[i * 3 + 2] = raw[i * rec + 2];
+      }
+      const rgb = new Uint8Array(n * 3);
+      const u8 = new Uint8Array(buf);
+      for (let i = 0; i < n; i++) {
+        rgb[i * 3] = u8[i * 16 + 12];
+        rgb[i * 3 + 1] = u8[i * 16 + 13];
+        rgb[i * 3 + 2] = u8[i * 16 + 14];
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(xyz, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(rgb, 3, true));
+      reconGroup.add(new THREE.Points(geo, new THREE.PointsMaterial({
+        size: 0.16, vertexColors: true, sizeAttenuation: true })));
+      const btn = document.getElementById('reconBtn');
+      btn.disabled = false;
+      btn.textContent = 'Reconstruction: off';
+    })
+    .catch(e => { document.getElementById('reconBtn').textContent = 'Reconstruction: n/a'; }))
+  .catch(() => { document.getElementById('reconBtn').textContent = 'Reconstruction: n/a'; });
 
 // ── Our car (ego): textured GLTF model, ~4.6 m long like a real sedan.
 // Loaded from assets/car.glb; until it arrives a simple placeholder box shows.
@@ -578,6 +623,13 @@ $('view').onchange = e => {
   else { cam.phi = 0.7; cam.theta = Math.PI * 0.75; cam.r = 34; }
 };
 $('liveBtn').onclick = () => goLive(!live);
+$('reconBtn').onclick = () => {
+  const on = !reconGroup.visible;
+  reconGroup.visible = on;
+  if (gridHelper) gridHelper.visible = !on; // real road replaces the wireframe
+  $('reconBtn').textContent = 'Reconstruction: ' + (on ? 'on' : 'off');
+  $('reconBtn').classList.toggle('on', on);
+};
 </script>
 </body>
 </html>

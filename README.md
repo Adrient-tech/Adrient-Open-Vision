@@ -132,6 +132,22 @@ sign — plus MiDaS-small depth). Fetch them with `models/download_models.sh`;
 details and the retraining guide: **[models/README.md](models/README.md)** and
 **[docs/training.md](docs/training.md)**.
 
+## 3D reconstruction (video → geometry)
+
+`scripts/reconstruct3d.py` converts the dashcam video into actual 3D geometry,
+the way Tesla's render does: every frame's MiDaS depth is calibrated against
+the ground-plane homography (`engine/config/H.yaml`), back-projected to metric
+3D, and fused across frames using the ego odometry from `world_state.jsonl`:
+
+```bash
+python3 scripts/reconstruct3d.py <input.mp4> <world_state.jsonl> \
+    engine/config/H.yaml engine/assets/depth/midas-small.onnx viewer/assets
+```
+
+It writes `viewer/assets/reconstruction.{bin,json}`; the viewer's
+**Reconstruction** toggle renders the fused, coloured point cloud in the same
+world space as the tracked boxes (the wireframe grid hides while it is on).
+
 ## Documentation
 
 | Page | Contents |
