@@ -5,17 +5,17 @@ Context: this benchmark closes the open item from the same session — see also 
 
 ## Build
 
-- Configure: `cmake .. -DGPU=OFF -DENABLE_OCCUPANCY=ON -DONNXRUNTIME_ROOT=engine/onnxruntime-cpu -DCMAKE_BUILD_TYPE=Release`
+- Configure: `cmake .. -DGPU=OFF -DENABLE_OCCUPANCY=ON -DONNXRUNTIME_ROOT=third_party/onnxruntime-cpu -DCMAKE_BUILD_TYPE=Release`
 - Result: build completes 100% (`Built target VisionPilot`).
 - Host deltas vs upstream docs (Ubuntu 26.04, not 22.04):
   - Extra apt packages beyond upstream list: `coinor-libipopt-dev`, `libcppad-dev`, `python3-opencv` (Python 3.14 has no cv2 wheel; the apt package provides it for build-time homography generation).
-  - Boost 1.90 ships no `boost_system` CMake config (header-only since 1.69); a local stub lives at `engine/cmake/boost_system-1.90.0/` (added via `CMAKE_PREFIX_PATH`, no upstream source change).
-  - ONNX Runtime: assembled from the PyPI wheel `onnxruntime==1.24.1` (lib) plus headers from the matching v1.24.1 tag; layout `engine/onnxruntime-cpu/{include,lib}`. Run binaries with `LD_LIBRARY_PATH=engine/onnxruntime-cpu/lib`.
+  - Boost 1.90 ships no `boost_system` CMake config (header-only since 1.69); a local stub lives at `third_party/boost-cmake/boost_system-1.90.0/` (added via `CMAKE_PREFIX_PATH`, no upstream source change).
+  - ONNX Runtime: assembled from the PyPI wheel `onnxruntime==1.24.1` (lib) plus headers from the matching v1.24.1 tag; layout `third_party/onnxruntime-cpu/{include,lib}`. Run binaries with `LD_LIBRARY_PATH=third_party/onnxruntime-cpu/lib`.
   - One-line source change: uncommented `pipeline.latency().print()` in `app/vision_pilot.cpp` to expose per-frame latency (needed for the PRD's measurement mandate).
 
 ## Dataset
 
-OpenLane sample sequences from upstream's Google Drive, downloaded to `engine/sample_dataset/` (test_open_lane_1..8, each `input.mp4` + `frame_speed.txt`). Benchmark used `test_open_lane_2` (1,198 frames @ 10 fps).
+OpenLane sample sequences from upstream's Google Drive, downloaded to `data/sample_dataset/` (test_open_lane_1..8, each `input.mp4` + `frame_speed.txt`). Benchmark used `test_open_lane_2` (1,198 frames @ 10 fps).
 
 ## Run (recorded-video mode, config `config/vision_pilot_test.conf`)
 

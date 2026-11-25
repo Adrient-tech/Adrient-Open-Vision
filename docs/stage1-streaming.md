@@ -22,9 +22,9 @@ Diagnostic tip for future state-change failures: run with `GST_DEBUG=4` — webr
 ## How to reproduce
 
 ```
-cd engine/upstream/VisionPilot/build
+cd perception/VisionPilot/build
 cmake .. -DGPU=OFF -DENABLE_OCCUPANCY=ON -DENABLE_RERUN=ON \
-  -DONNXRUNTIME_ROOT=/vercel/sandbox/repo/engine/onnxruntime-cpu -DCMAKE_BUILD_TYPE=Release
+  -DONNXRUNTIME_ROOT=/vercel/sandbox/repo/third_party/onnxruntime-cpu -DCMAKE_BUILD_TYPE=Release
 CMAKE_POLICY_VERSION_MINIMUM=3.5 cmake --build . -j8
 LD_LIBRARY_PATH=../../../onnxruntime-cpu/lib xvfb-run -a ./VisionPilot
 # → visionpilot.rrd in the build dir; live HUD at http://<host>:8080/

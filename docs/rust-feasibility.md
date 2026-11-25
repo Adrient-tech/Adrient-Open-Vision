@@ -5,14 +5,14 @@ Date: 2026-11-25. Question from Adrient: "Can we build this entirely in Rust? Is
 ## Short answer
 
 Yes, it is possible — and part of it already is. The stage-2 world model
-(`engine/worldmodel/`) is pure Rust today. Rewriting the rest of the pipeline
+(`worldmodel/`) is pure Rust today. Rewriting the rest of the pipeline
 in Rust is realistic, but the perception network inference is the one part
 where Rust buys no speed: it is ONNX Runtime doing the work either way.
 
 ## Measured today (this machine, 8 CPU cores)
 
 ```
-cargo build --release  # engine/worldmodel
+cargo build --release  # worldmodel
 /usr/bin/time -v ./target/release/worldmodel \
     ../upstream/VisionPilot/build/perception.jsonl /tmp/world_state_timed.jsonl 10
   Elapsed (wall clock) time: 0:00.00   (197 frames)

@@ -16,7 +16,7 @@ Date: 2026-11-24 · Environment: Ubuntu Linux cloud workspace, no GPU
 ## 2. Upstream repository, pinned
 
 - Repo: https://github.com/autowarefoundation/vision_pilot
-- Pinned tag: **v1.2** (checked out at commit `9a96c3e7`), cloned to `engine/upstream/`
+- Pinned tag: **v1.2** (checked out at commit `9a96c3e7`), cloned to `perception/`
 - Licence: Apache 2.0 (`LICENSE` at repo root). Model weights are bundled in-repo under the same project (see §6).
 - Note: the PRD's URL `autowarefoundation/vision_pilot` redirects from the older `autoware_vision_pilot` name used in the upstream README; both resolve to the same repository.
 

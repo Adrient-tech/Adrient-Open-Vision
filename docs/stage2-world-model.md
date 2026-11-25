@@ -4,13 +4,13 @@ Date: 2026-11-25. Builds on stage 1 (`docs/stage1-streaming.md`); roadmap in `do
 
 ## What was built and verified
 
-The engine's per-frame world view is now fused over time into a **persistent world model**, implemented as a standalone **Rust** crate (`engine/worldmodel/`) — a working proof that the non-CV parts of this stack build and run in Rust.
+The engine's per-frame world view is now fused over time into a **persistent world model**, implemented as a standalone **Rust** crate (`worldmodel/`) — a working proof that the non-CV parts of this stack build and run in Rust.
 
 Two pieces:
 
 1. **Perception feed (C++, ~50 lines).** `VisionPilot` now writes one JSONL line per frame when `world_log_on = true` in `config/vision_pilot.conf`: ego speed, fused CIPO, path polynomial, and every AutoSpeed detection projected to world coordinates through the calibrated homography `H_resized` (bottom-centre pixel, same convention as CIPO selection). Fields: `frame_id, ego_v, wall_ms, cipo{...}, path{a,b,c,cte,yaw,kappa}, dets[{cls,score,x,y}]`. No upstream algorithm code changed.
 
-2. **World model (Rust, `engine/worldmodel/src/main.rs`).** Consumes the JSONL and maintains ground-fixed world state:
+2. **World model (Rust, `worldmodel/src/main.rs`).** Consumes the JSONL and maintains ground-fixed world state:
    - ego odometry: `x += v·dt` per frame;
    - object tracks: greedy nearest-neighbour association with an adaptive covariance gate, per-track constant-velocity filter (position + world-frame velocity), track lifecycle (tentative → confirmed after 3 hits, deleted after 10 misses);
    - CIPO over tracks: nearest confirmed track on the path ahead (`|y| < 1.8 m`), replacing the per-frame-only estimate with a persistent identity;
@@ -18,7 +18,7 @@ Two pieces:
 
 ## Verified numbers (sample run `test_open_lane_2`, 197 frames)
 
-Command: `cd engine/upstream/VisionPilot/build && LD_LIBRARY_PATH=../../../onnxruntime-cpu/lib xvfb-run -a ./VisionPilot` (exit 0), then `cd engine/worldmodel && cargo run --release -- ../upstream/VisionPilot/build/perception.jsonl ../upstream/VisionPilot/build/world_state.jsonl 10` (exit 0).
+Command: `cd perception/VisionPilot/build && LD_LIBRARY_PATH=../../../onnxruntime-cpu/lib xvfb-run -a ./VisionPilot` (exit 0), then `cd worldmodel && cargo run --release -- ../upstream/VisionPilot/build/perception.jsonl ../upstream/VisionPilot/build/world_state.jsonl 10` (exit 0).
 
 - 627 detections consumed (avg 3.18/frame), engine CIPO valid on 197/197 frames.
 - 186 track identities created, **54 tracks confirmed** (≥3 hits), 2 alive at end of run.
@@ -31,7 +31,7 @@ Command: `cd engine/upstream/VisionPilot/build && LD_LIBRARY_PATH=../../../onnxr
 
 ```bash
 # 1. perception feed (engine run, ~50 s offline)
-cd engine/upstream/VisionPilot/build
+cd perception/VisionPilot/build
 LD_LIBRARY_PATH=../../../onnxruntime-cpu/lib xvfb-run -a ./VisionPilot
 # → perception.jsonl
 
