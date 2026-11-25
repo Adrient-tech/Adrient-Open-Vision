@@ -55,9 +55,11 @@ std::vector<float> chw_01(const cv::Mat& bgr)
 
 std::string find_model(const std::string& filename) {
     const std::string local  = "modules/models/weights/" + filename;
+    const std::string repo   = "../../engine/modules/models/weights/" + filename;
     const std::string system = "/usr/share/openvision/modules/models/weights/" + filename;
 
     if (std::filesystem::exists(local))  return local;
+    if (std::filesystem::exists(repo))   return repo;
     if (std::filesystem::exists(system)) return system;
 
     throw std::runtime_error("Config file not found: " + filename);
@@ -83,7 +85,7 @@ void LatencyStats::reset() { *this = {}; }
 InferencePipeline::InferencePipeline(engine::OnnxEngine& engine, const Config& cfg)
     : auto_drive_(engine, find_model("autodrive_" + cfg.precision + ".onnx"))
     , auto_steer_(engine, find_model("autosteer_" + cfg.precision + ".onnx"))
-    , auto_speed_(engine, find_model("autospeed_" + cfg.precision + ".onnx"))
+    , auto_speed_(engine, find_model("yolo11n.onnx"), /*sigmoid_logits=*/false)
 {
     fusion::LongitudinalFusion::Config lc;
     lc.debug           = cfg.fusion_debug;

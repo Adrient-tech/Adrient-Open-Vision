@@ -10,11 +10,13 @@ namespace openvision::models {
 
 // ─── Constructor ─────────────────────────────────────────────────────────────
 
-AutoSpeed::AutoSpeed(engine::OnnxEngine& engine, const std::string& model_path)
+AutoSpeed::AutoSpeed(engine::OnnxEngine& engine, const std::string& model_path,
+                     bool sigmoid_logits)
     : session_(engine.create_session(model_path, "autospeed_"))
     , mem_info_(Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault))
     , input_shape_{1, 3, NET_H, NET_W}
     , arena_shrink_(engine.config().provider == "cpu" ? "cpu:0" : "cpu:0;gpu:0")
+    , sigmoid_logits_(sigmoid_logits)
 {
     Ort::AllocatorWithDefaultOptions alloc;
     const size_t n_in  = session_->GetInputCount();
@@ -112,7 +114,10 @@ AutoSpeedOutput AutoSpeed::post_process(
         float best_prob = -1.f;
         int   best_cls  =  0;
         for (int c = 0; c < num_classes; ++c) {
-            const float prob = 1.f / (1.f + std::exp(-data[(4 + c) * N + n]));
+            const float raw  = data[(4 + c) * N + n];
+            const float prob = sigmoid_logits_
+                                   ? 1.f / (1.f + std::exp(-raw))
+                                   : raw;
             if (prob > best_prob) { best_prob = prob; best_cls = c; }
         }
 

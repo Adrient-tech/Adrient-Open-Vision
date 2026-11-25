@@ -122,6 +122,27 @@ works best: 2 MP or higher, horizontal field of view between 50 and 55
 degrees, zero roll, facing forward with a 1–3 degree downward pitch
 (10–15 degrees for tall vehicles). See `engine/Sensing/README.md` and the
 calibration guide in `engine/Calibration/` for the full procedure.
+Full rig guides — single dashcam, multi-camera ring, BEV type: **[docs/camera-setup.md](docs/camera-setup.md)**.
+
+## Models
+
+All models are ONNX and ship pre-trained (YOLO11n detector with 80 COCO
+classes — car, truck, bus, motorcycle, bicycle, person, traffic light, stop
+sign — plus MiDaS-small depth). Fetch them with `models/download_models.sh`;
+details and the retraining guide: **[models/README.md](models/README.md)** and
+**[docs/training.md](docs/training.md)**.
+
+## Documentation
+
+| Page | Contents |
+|---|---|
+| [docs/camera-setup.md](docs/camera-setup.md) | Camera setup: single dashcam, multi-camera ring, BEV type, calibration, troubleshooting |
+| [docs/cpu-setup.md](docs/cpu-setup.md) | CPU-only build and run, performance tuning |
+| [docs/gpu-setup.md](docs/gpu-setup.md) | CPU + GPU setup with the CUDA ONNX Runtime, remote GPU hosts |
+| [docs/training.md](docs/training.md) | Training / fine-tuning the detector, lane head and BEV network |
+| [docs/world-model.md](docs/world-model.md) | Tracker internals: gates, confirmation, CIPO |
+| [docs/build-and-benchmarks.md](docs/build-and-benchmarks.md) | Build details and measured benchmark numbers |
+| [models/README.md](models/README.md) | Model inventory, downloads, export commands |
 
 ## Configuration reference
 

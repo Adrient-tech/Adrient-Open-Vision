@@ -182,10 +182,13 @@ loader.load('assets/car.glb', g => {
 // Class-aware materials and geometry factories (footprints come from the scene
 // file: w = width (y), l = length (x), h = height).
 const KIND = {
-  vehicle: { color: 0x4da3ff, geo: g => new THREE.BoxGeometry(g.l, g.h, g.w), y: g => g.h / 2 },
-  person:  { color: 0x22d3a5, geo: g => new THREE.CapsuleGeometry(g.w / 2, Math.max(0.1, g.h - g.w), 4, 10), y: g => g.h / 2 },
-  truck:   { color: 0xffb454, geo: g => new THREE.BoxGeometry(g.l, g.h, g.w), y: g => g.h / 2 },
-  bicycle: { color: 0xff6bd6, geo: g => new THREE.BoxGeometry(g.l, g.h * 0.7, g.w), y: g => g.h * 0.35 },
+  vehicle:    { color: 0x4da3ff, geo: g => new THREE.BoxGeometry(g.l, g.h, g.w), y: g => g.h / 2 },
+  car:        { color: 0x4da3ff, geo: g => new THREE.BoxGeometry(g.l, g.h, g.w), y: g => g.h / 2 },
+  person:     { color: 0x22d3a5, geo: g => new THREE.CapsuleGeometry(g.w / 2, Math.max(0.1, g.h - g.w), 4, 10), y: g => g.h / 2 },
+  truck:      { color: 0xffb454, geo: g => new THREE.BoxGeometry(g.l, g.h, g.w), y: g => g.h / 2 },
+  bus:        { color: 0xffd166, geo: g => new THREE.BoxGeometry(g.l, g.h, g.w), y: g => g.h / 2 },
+  motorcycle: { color: 0xff8f6b, geo: g => new THREE.BoxGeometry(g.l, g.h, g.w), y: g => g.h / 2 },
+  bicycle:    { color: 0xff6bd6, geo: g => new THREE.BoxGeometry(g.l, g.h * 0.7, g.w), y: g => g.h * 0.35 },
 };
 const kindMat = k => new THREE.MeshLambertMaterial({ color: KIND[k]?.color ?? 0x4da3ff,
                       transparent: true, opacity: k === 'vehicle' ? 1 : 0.95 });

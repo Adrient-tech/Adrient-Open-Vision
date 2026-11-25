@@ -45,7 +45,7 @@ echo "2/3 World model…"
     "../$BUILD/perception.jsonl" "../$BUILD/world_state.jsonl" "$FPS")
 
 echo "3/3 Scene adapter…"
-(cd worldmodel && ./target/release/adapter \
+(cd worldmodel && cargo build --release --bin adapter && ./target/release/adapter \
     "../$BUILD/world_state.jsonl" ../viewer/scene.json "$FPS")
 
 echo "Done. Serve the viewer:  python3 -m http.server 3000 --directory viewer"

@@ -73,16 +73,18 @@ const PATH_X_MAX: f64 = 60.0;
 const PATH_STEPS: usize = 24;
 
 // Model class id → viewer kind + canonical footprint (w, l, h) in metres.
-// Assumed mapping for the 4-class AutoSpeed-style head (C = 4 box + 4 classes):
-// 0 = car, 1 = person, 2 = bus/truck, 3 = car (default). Class 1 in the current
-// dataset tracks the steady lead object in the ego lane, so anything unmapped
-// renders as a vehicle.
+// COCO class ids from the YOLO11n head (C = 4 box + 80 classes) → viewer kind
+// + canonical footprint (w, l, h) in metres. Everything unmapped renders as a
+// generic vehicle box.
 fn class_kind(cls: i32) -> (&'static str, f64, f64, f64) {
     match cls {
-        1 => ("person", 0.6, 0.6, 1.7),
-        2 => ("truck", 2.5, 8.0, 3.5),
-        4 => ("bicycle", 0.8, 1.8, 1.7),
-        _ => ("vehicle", 2.0, 4.6, 1.6),
+        0 => ("person", 0.6, 0.6, 1.7),
+        1 => ("bicycle", 0.8, 1.8, 1.7),
+        2 => ("car", 1.9, 4.6, 1.5),
+        3 => ("motorcycle", 1.0, 2.4, 1.6),
+        5 | 6 => ("bus", 2.6, 11.0, 3.5),  // bus / train
+        7 => ("truck", 2.5, 8.0, 3.5),
+        _ => ("vehicle", 2.0, 4.6, 1.6),   // fire hydrant, traffic light, …
     }
 }
 

@@ -44,7 +44,12 @@ public:
     static constexpr int NET_W    = 1024;
     static constexpr int CHW_SIZE = 3 * NET_H * NET_W;
 
-    AutoSpeed(engine::OnnxEngine& engine, const std::string& model_path);
+    // sigmoid_logits: true  — head emits raw logits (autospeed_*.onnx): apply
+    //                         sigmoid in post-processing.
+    //                 false — head already emits probabilities in [0, 1]
+    //                         (YOLOv8/v11 Ultralytics ONNX export): use as-is.
+    AutoSpeed(engine::OnnxEngine& engine, const std::string& model_path,
+              bool sigmoid_logits = true);
 
     // image_chw  : float32 CHW buffer, CHW_SIZE elements, RGB [0, 1]
     // conf_thres : sigmoid class probability threshold
@@ -71,6 +76,7 @@ private:
 
     std::vector<int64_t> input_shape_;  // {1, 3, NET_H, NET_W}
     std::string arena_shrink_;
+    bool sigmoid_logits_ = true;
 };
 
 }  // namespace openvision::models
