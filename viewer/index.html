@@ -170,7 +170,7 @@ scene.add(pathLine);
 // Tier from the URL (?tier=beginner|mid|top, default beginner) — mirrors the
 // pipeline's tier flag: it picks render quality only, never invents content.
 const TIER = (new URLSearchParams(location.search).get('tier') || 'beginner').toLowerCase();
-const TIER_RECON = { beginner: { size: 0.16 }, mid: { size: 0.12 }, top: { size: 0.09 } };
+const TIER_RECON = { beginner: { size: 0.07 }, mid: { size: 0.05 }, top: { size: 0.035 } };
 const reconStyle = TIER_RECON[TIER] || TIER_RECON.beginner;
 
 // ── 3D reconstruction layer: the camera images converted into actual geometry
@@ -190,24 +190,33 @@ fetch('assets/reconstruction.json').then(r => { if (!r.ok) throw new Error(r.sta
       // a stride so the colour bytes never land inside a float.
       const rec = hdr.point_bytes / 4; // 4 float32 slots per record
       const raw = new Float32Array(buf, 0, n * rec);
+      // The file stores (longitudinal, lateral, height) in world coords; three.js
+      // is (x=lateral, y=up, z=forward), so remap — passing the axes through raw
+      // turns the road's lateral spread into altitude (a dome over the scene).
+      // Sky points (parallax noise with no reliable depth) and points beyond
+      // sensor range come out as far-flung outliers, so keep the plausibility
+      // envelope: on/near the road plane, within ~90 m of the car's origin.
       const xyz = new Float32Array(n * 3);
-      for (let i = 0; i < n; i++) {
-        xyz[i * 3] = raw[i * rec];
-        xyz[i * 3 + 1] = raw[i * rec + 1];
-        xyz[i * 3 + 2] = raw[i * rec + 2];
-      }
       const rgb = new Uint8Array(n * 3);
       const u8 = new Uint8Array(buf);
+      let m = 0;
       for (let i = 0; i < n; i++) {
-        rgb[i * 3] = u8[i * 16 + 12];
-        rgb[i * 3 + 1] = u8[i * 16 + 13];
-        rgb[i * 3 + 2] = u8[i * 16 + 14];
+        const lon = raw[i * rec], lat = raw[i * rec + 1], hgt = raw[i * rec + 2];
+        if (hgt < -0.5 || hgt > 6 || Math.abs(lat) > 25 || lon < -20 || lon > 120) continue;
+        xyz[m * 3]     = lat;  // lateral → x
+        xyz[m * 3 + 1] = hgt;  // height  → y (up)
+        xyz[m * 3 + 2] = lon;  // longitudinal → z (forward)
+        rgb[m * 3] = u8[i * 16 + 12];
+        rgb[m * 3 + 1] = u8[i * 16 + 13];
+        rgb[m * 3 + 2] = u8[i * 16 + 14];
+        m++;
       }
       const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(xyz, 3));
-      geo.setAttribute('color', new THREE.BufferAttribute(rgb, 3, true));
+      geo.setAttribute('position', new THREE.BufferAttribute(xyz.subarray(0, m * 3), 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(rgb.subarray(0, m * 3), 3, true));
       reconGroup.add(new THREE.Points(geo, new THREE.PointsMaterial({
         size: reconStyle.size, vertexColors: true, sizeAttenuation: true })));
+      document.getElementById('reconBtn').title = m.toLocaleString() + ' points';
       const btn = document.getElementById('reconBtn');
       btn.disabled = false;
       btn.textContent = 'Reconstruction: off';
@@ -338,7 +347,9 @@ function syncObjects(f) {
 
 // ── Orbit camera (mouse + touch): drag rotates around the ego target,
 // wheel / pinch zooms. theta = azimuth, phi = polar, r = radius.
-const cam = { theta: Math.PI, phi: 1.05, r: 26, targetX: 0 };
+// Chase view sits low and close, road filling the frame (the Tesla look):
+// ~4 m up, ~9 m behind the car.
+const cam = { theta: Math.PI, phi: 1.32, r: 10, targetX: 0 };
 function applyCamera() {
   cam.phi = Math.max(0.15, Math.min(Math.PI / 2 - 0.02, cam.phi)); // stay above ground
   cam.r = Math.max(6, Math.min(120, cam.r));
@@ -472,10 +483,14 @@ function offsetRibbon(pts, center, half, y) {
   g.setIndex(idxArr);
   return g;
 }
-function updateRoad(pathIn) {
+// off = the ego's current absolute x. f.path is ego-relative (starts at 0),
+// so the road must be shifted to the ego's world position or it renders
+// stranded tens of metres behind the car.
+function updateRoad(pathIn, off) {
   roadGroup.clear();
-  const path = smoothPath(pathIn);
-  if (!path || path.length < 2) return;
+  const rel = smoothPath(pathIn);
+  if (!rel || rel.length < 2) return;
+  const path = rel.map(([x, y]) => [x + off, y]);
   // Paved shoulders either side, then the asphalt: one lane either side of our
   // centreline. Drawn at slightly different heights so nothing z-fights.
   roadGroup.add(new THREE.Mesh(offsetRibbon(path, 0, LANE_W + 2.2, 0.0), shoulderMat));
@@ -550,8 +565,8 @@ function show(i) {
   $('cBicycle').textContent = counts.bicycle;
 
   pathLine.geometry.setFromPoints(
-    smoothPath(f.path).map(([x, y]) => new THREE.Vector3(y, 0.05, x)));
-  updateRoad(f.path);
+    smoothPath(f.path).map(([x, y]) => new THREE.Vector3(y, 0.05, x + f.ego.x)));
+  updateRoad(f.path, f.ego.x);
   updateAdas(f);
 
   // Ego car follows the tracked ego pose. Heading comes from the lane path at
@@ -654,7 +669,7 @@ $('view').onchange = e => {
   const v = e.target.value;
   if (v === 'top') { cam.phi = 0.2; cam.r = 60; }
   else if (v === 'bev') { cam.phi = 0.03; cam.r = 55; }   // near-orthographic bird's-eye
-  else if (v === 'chase') { cam.phi = 1.05; cam.theta = Math.PI; cam.r = 26; }
+  else if (v === 'chase') { cam.phi = 1.32; cam.theta = Math.PI; cam.r = 10; }
   else { cam.phi = 0.7; cam.theta = Math.PI * 0.75; cam.r = 34; }
 };
 $('liveBtn').onclick = () => goLive(!live);
