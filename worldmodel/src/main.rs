@@ -59,8 +59,12 @@ struct Det {
     cls: i32,
     #[allow(dead_code)]
     score: f64,
-    x: f64, // forward, ego frame [m]
+    x: f64, // forward, ego frame [m] (depth-refined when the engine sends `d`)
     y: f64, // lateral, ego frame [m] (+ = left? sign follows H convention)
+    // Depth analyser fields (optional: absent in older perception files).
+    d_homo: Option<f64>, // flat-ground homography distance [m]
+    d_depth: Option<f64>,// MiDaS-refined metric distance [m]
+    d_conf: Option<f64>, // 0..1 agreement between the two estimates
 }
 
 // ─── Output schema ─────────────────────────────────────────────────────────────
@@ -220,7 +224,17 @@ impl WorldModel {
         }
 
         // 2. Map ego-frame detections into the world frame.
-        let meas: Vec<(f64, f64, i32)> = f.dets.iter().map(|d| (self.ego_x + d.x, d.y, d.cls)).collect();
+        let meas: Vec<(f64, f64, i32)> = f
+            .dets
+            .iter()
+            .map(|d| {
+                // Depth-refined forward distance: when the engine's depth
+                // analyser ran, `d` carries the MiDaS-fused metric distance
+                // which beats the flat-ground homography off the ground plane.
+                let fwd = d.d_depth.unwrap_or(d.x);
+                (self.ego_x + fwd, d.y, d.cls)
+            })
+            .collect();
 
         // 3. Greedy nearest-neighbour association inside the gate.
         let mut assigned_t: Vec<bool> = vec![false; self.tracks.len()];
@@ -414,7 +428,7 @@ mod tests {
             path: PathIn { valid: false, a: 0.0, b: 0.0, c: 0.0, x_min: 0.0 },
             dets: dets
                 .into_iter()
-                .map(|(cls, x, y)| Det { cls, score: 0.9, x, y })
+                .map(|(cls, x, y)| Det { cls, score: 0.9, x, y, d_homo: None, d_depth: None, d_conf: None })
                 .collect(),
         }
     }

@@ -13,6 +13,7 @@
 #include <image_preprocessing/image_preprocessor.hpp>
 #include <logging/logger.hpp>
 #include <models/inference.hpp>
+#include <models/depth_analyser.hpp>
 #include <planning/planning.hpp>
 #include <visualization/visualization.hpp>
 #include <debug/debug_draw.hpp>
@@ -108,6 +109,14 @@ int main(int argc, char** argv)
     cv::Mat frame, warped, resized;
     bool h_resized_set = false;
     cv::Mat H = load_matrix("H.yaml", "H");
+
+    // Depth analyser: MiDaS-small monocular depth, refines the flat-ground
+    // homography distances of detections so vehicles off the ground plane
+    // (bodies, hoods, distant cars) keep their true metric distance.
+    vm::DepthAnalyser::Config depth_cfg;
+    depth_cfg.model_path = "assets/depth/midas-small.onnx";
+    depth_cfg.enabled = cfg.world_log_on;
+    vm::DepthAnalyser depth_analyser(engine, depth_cfg);
 
     // World-model feed: one JSONL line per processed frame.
     std::ofstream world_log;
@@ -217,12 +226,29 @@ int main(int argc, char** argv)
                         px.emplace_back((d.x1 + d.x2) * 0.5f, d.y2);   // bottom-center, like CIPO selection
                     if (!px.empty())
                         cv::perspectiveTransform(px, wx, Hw);
-                    char buf[128];
+
+                    // ── Depth refinement: MiDaS + homography fusion per detection ──
+                    // dets_px are in resized (net) coordinates — the same image
+                    // the detector ran on — and homo_dists are the flat-ground
+                    // distances the world model would see without depth.
+                    std::vector<float> homo_dists(r->auto_speed.detections.size());
+                    for (size_t i = 0; i < r->auto_speed.detections.size(); ++i)
+                        homo_dists[i] = static_cast<float>(
+                            std::sqrt(wx[i].x * wx[i].x + wx[i].y * wx[i].y));
+                    const auto refined = depth_analyser.refine(
+                        resized, homo_dists, px, Hw.inv());
+
+                    char buf[160];
                     for (size_t i = 0; i < r->auto_speed.detections.size(); ++i)
                     {
                         const auto& d = r->auto_speed.detections[i];
-                        snprintf(buf, sizeof(buf), "%s{\"cls\":%d,\"score\":%.3f,\"x\":%.2f,\"y\":%.2f}",
-                                 i ? "," : "", d.class_id, d.score, wx[i].x, wx[i].y);
+                        snprintf(buf, sizeof(buf),
+                                 "%s{\"cls\":%d,\"score\":%.3f,\"x\":%.2f,\"y\":%.2f,"
+                                 "\"d_homo\":%.2f,\"d_depth\":%.2f,\"d\":%.2f,"
+                                 "\"d_conf\":%.2f}",
+                                 i ? "," : "", d.class_id, d.score, wx[i].x, wx[i].y,
+                                 refined[i].raw_distance_m, refined[i].distance_m,
+                                 refined[i].distance_m, refined[i].confidence);
                         dets += buf;
                     }
                 }

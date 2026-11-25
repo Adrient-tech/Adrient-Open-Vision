@@ -99,6 +99,7 @@
 </script>
 <script type="module">
 import * as THREE from 'three';
+import { GLTFLoader } from './vendor/GLTFLoader.js';
 
 const err = document.getElementById('err');
 const scene = new THREE.Scene();
@@ -126,6 +127,33 @@ const pathLine = new THREE.Line(
 );
 scene.add(pathLine);
 
+// ── Our car (ego): textured GLTF model, ~4.6 m long like a real sedan.
+// Loaded from assets/car.glb; until it arrives a simple placeholder box shows.
+const EGO_LEN = 4.6, EGO_W = 1.9, EGO_H = 1.4;
+const egoGroup = new THREE.Group(); scene.add(egoGroup);
+{
+  const ph = new THREE.Mesh(
+    new THREE.BoxGeometry(EGO_LEN, EGO_H, EGO_W),
+    new THREE.MeshLambertMaterial({ color: 0xd8e2f2 })
+  );
+  ph.position.y = EGO_H / 2;
+  egoGroup.add(ph);
+}
+const loader = new GLTFLoader();
+loader.load('assets/car.glb', g => {
+  const car = g.scene;
+  const box = new THREE.Box3().setFromObject(car);
+  const size = box.getSize(new THREE.Vector3());
+  const s = EGO_LEN / Math.max(size.x, size.z, 0.001); // normalise length to 4.6 m
+  car.scale.setScalar(s);
+  // Re-centre on the ground under the group origin.
+  box.setFromObject(car);
+  car.position.y -= box.min.y;
+  car.position.z -= (box.min.z + box.max.z) / 2;
+  car.position.x -= (box.min.x + box.max.x) / 2;
+  egoGroup.clear(); egoGroup.add(car);
+}, undefined, () => { /* keep placeholder box on load failure */ });
+
 // Class-aware materials and geometry factories (footprints come from the scene
 // file: w = width (y), l = length (x), h = height).
 const KIND = {
@@ -150,6 +178,35 @@ function meshFor(v) {
   const m = new THREE.Mesh(geo, stateMat(v.state) || matFor(k));
   m.position.set(v.y, KIND[k].y(g), v.x);
   return m;
+}
+
+// ── Persistent track meshes: one mesh per track id, updated in place so the
+// same physical vehicle moves smoothly frame to frame instead of flickering.
+const trackMeshes = new Map();
+function syncObjects(f) {
+  const seen = new Set();
+  const counts = { vehicle: 0, person: 0, truck: 0, bicycle: 0 };
+  for (const v of f.vehicles) {
+    seen.add(v.id);
+    let m = trackMeshes.get(v.id);
+    if (!m || m.userData.kind !== (KIND[v.kind] ? v.kind : 'vehicle')) {
+      if (m) objects.remove(m);
+      m = meshFor(v);
+      m.userData.kind = KIND[v.kind] ? v.kind : 'vehicle';
+      trackMeshes.set(v.id, m);
+      objects.add(m);
+    } else {
+      const k = m.userData.kind, g = { w: v.w, l: v.l, h: v.h };
+      m.material = stateMat(v.state) || matFor(k);
+      m.position.lerp(new THREE.Vector3(v.y, KIND[k].y(g), v.x), 0.55);
+      m.visible = true;
+    }
+    counts[m.userData.kind]++;
+  }
+  for (const [id, m] of trackMeshes) {
+    if (!seen.has(id)) { objects.remove(m); trackMeshes.delete(id); }
+  }
+  return counts;
 }
 
 // ── Orbit camera (mouse + touch): drag rotates around the ego target,
@@ -229,19 +286,18 @@ function show(i) {
   $('scrub').max = frames.length - 1;
   $('frameLabel').textContent = 'frame ' + f.frame_id + '  (' + f.t.toFixed(1) + ' s)';
 
-  objects.clear();
-  const counts = { vehicle: 0, person: 0, truck: 0, bicycle: 0 };
-  for (const v of f.vehicles) {
-    objects.add(meshFor(v));
-    const k = KIND[v.kind] ? v.kind : 'vehicle';
-    counts[k]++;
-  }
+  objects.visible = true;
+  const counts = syncObjects(f);
   $('cVehicle').textContent = counts.vehicle;
   $('cPerson').textContent = counts.person;
   $('cTruck').textContent = counts.truck;
   $('cBicycle').textContent = counts.bicycle;
 
   pathLine.geometry.setFromPoints(f.path.map(([x, y]) => new THREE.Vector3(y, 0.05, x)));
+
+  // Ego car follows the tracked ego pose; heading from ego motion direction.
+  egoGroup.position.set(0, 0, f.ego.x);
+  egoGroup.rotation.y = Math.PI; // model front faces +x (forward)
 
   // Camera follows the ego forward position in chase/orbit views.
   cam.targetX = f.ego.x;

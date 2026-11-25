@@ -6,6 +6,7 @@ add_library(models
     src/auto_drive.cpp
     src/auto_steer.cpp
     src/auto_speed.cpp
+    src/depth_analyser.cpp
     src/inference.cpp
 )
 
