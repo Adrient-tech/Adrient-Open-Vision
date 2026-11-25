@@ -153,18 +153,16 @@ const egoGroup = new THREE.Group(); scene.add(egoGroup);
 }
 const loader = new GLTFLoader();
 loader.load('assets/car.glb', g => {
-  // Some free models ship extra scenery (ToyCar has a large patterned ground
-  // sheet). Keep only the biggest submesh — the car body itself — and drop
-  // everything else so no ground plane renders under the ego car.
-  let best = null, bestVol = -1;
+  // Some free models ship extra scenery (ToyCar has a "Fabric" ground sheet).
+  // Keep only the submesh named like a car body and drop the rest.
+  const BODY = /car|body|chassis/i, JUNK = /fabric|carpet|ground|sheet|shadow/i;
+  let best = null;
   g.scene.updateMatrixWorld(true);
   g.scene.traverse(o => {
-    if (o.isMesh) {
-      const b = new THREE.Box3().setFromObject(o);
-      const s = b.getSize(new THREE.Vector3());
-      const vol = s.x * s.y * s.z;
-      if (vol > bestVol) { bestVol = vol; best = o; }
-    }
+    if (!o.isMesh) return;
+    const name = (o.name || '') + '|' + (o.material && o.material.name || '');
+    if (JUNK.test(name)) return;
+    if (BODY.test(name) || !best) best = o; // first non-junk mesh = car body
   });
   if (!best) return;
   const car = new THREE.Group();
@@ -206,6 +204,12 @@ function meshFor(v) {
   m.position.set(v.y, KIND[k].y(g), v.x);
   return m;
 }
+// Face each box along its own velocity so it reads as a vehicle, not a flat
+// rectangle; persons are rotation-symmetric so skip them.
+function aimMesh(m, v) {
+  if (m.userData.kind !== 'person' && (Math.abs(v.vx) + Math.abs(v.vy)) > 0.3)
+    m.rotation.y = Math.atan2(v.vx, v.vy);
+}
 
 // ── Persistent track meshes: one mesh per track id, updated in place so the
 // same physical vehicle moves smoothly frame to frame instead of flickering.
@@ -220,12 +224,14 @@ function syncObjects(f) {
       if (m) objects.remove(m);
       m = meshFor(v);
       m.userData.kind = KIND[v.kind] ? v.kind : 'vehicle';
+      aimMesh(m, v);
       trackMeshes.set(v.id, m);
       objects.add(m);
     } else {
       const k = m.userData.kind, g = { w: v.w, l: v.l, h: v.h };
       m.material = stateMat(v.state) || matFor(k);
       m.position.lerp(new THREE.Vector3(v.y, KIND[k].y(g), v.x), 0.55);
+      aimMesh(m, v);
       m.visible = true;
     }
     counts[m.userData.kind]++;
