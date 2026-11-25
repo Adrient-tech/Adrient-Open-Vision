@@ -94,8 +94,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let fps: f64 = args.get(3).map(|s| s.parse().unwrap()).unwrap_or(10.0);
 
+    // Resolve a bare output filename against the repository root so the
+    // adapter works from any cwd (e.g. `viewer/scene.json` from worldmodel/).
+    let out_path = std::path::Path::new(&args[2]);
+    let cwd = std::env::current_dir()?;
+    let out_path = if out_path.parent().map_or(false, |p| p.exists()) {
+        cwd.join(out_path)
+    } else {
+        let repo_root = cwd
+            .ancestors()
+            .find(|p| p.join("engine").exists() && p.join("viewer").exists())
+            .map(|p| p.to_path_buf())
+            .ok_or("repository root not found: pass an output path with an existing parent directory")?;
+        repo_root.join(out_path)
+    };
+
     let input = File::open(&args[1]).expect("open world_state.jsonl");
-    let out = File::create(&args[2]).expect("create scene.json");
+    let out = File::create(&out_path).expect("create scene.json");
     let mut out = BufWriter::new(out);
 
     out.write_all(b"{\"schema\":\"adrient.openvision/scene@2\",\"fps\":")?;
