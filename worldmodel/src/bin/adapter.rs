@@ -5,10 +5,12 @@
 // Output: scene.json — the Adrient-branded, normalised scene message consumed
 //         by the OpenVision 3D viewer (React + Three.js).
 //
-// Contract (schema version 1):
+// Contract (schema version 2): adds the model class id per track so the viewer
+// can render class-aware shapes (vehicle vs person vs two-wheeler), plus a
+// per-class canonical footprint (width, length, height in metres) for sizing.
 //   { schema, fps, frames: [{ t, frame_id, ego { x, v },
 //      path: [[x, y], ...],  // sampled plan polyline, ego frame, forward x
-//      vehicles: [{ id, x, y, vx, vy, state }],
+//      vehicles: [{ id, cls, kind, w, l, h, x, y, vx, vy, state }],
 //      cipo: { valid, track_id, d, v_rel, cut_in } }] }
 //
 // Usage: adapter <world_state.jsonl> <scene.json> [fps]
@@ -51,6 +53,8 @@ struct Track {
     vx: f64,
     vy: f64,
     state: String,
+    #[serde(default)]
+    cls: i32,
 }
 
 #[derive(Deserialize, Default)]
@@ -68,6 +72,20 @@ struct Cipo {
 const PATH_X_MAX: f64 = 60.0;
 const PATH_STEPS: usize = 24;
 
+// Model class id → viewer kind + canonical footprint (w, l, h) in metres.
+// Assumed mapping for the 4-class AutoSpeed-style head (C = 4 box + 4 classes):
+// 0 = car, 1 = person, 2 = bus/truck, 3 = car (default). Class 1 in the current
+// dataset tracks the steady lead object in the ego lane, so anything unmapped
+// renders as a vehicle.
+fn class_kind(cls: i32) -> (&'static str, f64, f64, f64) {
+    match cls {
+        1 => ("person", 0.6, 0.6, 1.7),
+        2 => ("truck", 2.5, 8.0, 3.5),
+        4 => ("bicycle", 0.8, 1.8, 1.7),
+        _ => ("vehicle", 2.0, 4.6, 1.6),
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
@@ -80,7 +98,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out = File::create(&args[2]).expect("create scene.json");
     let mut out = BufWriter::new(out);
 
-    out.write_all(b"{\"schema\":\"adrient.openvision/scene@1\",\"fps\":")?;
+    out.write_all(b"{\"schema\":\"adrient.openvision/scene@2\",\"fps\":")?;
     serde_json::to_writer(&mut out, &fps)?;
     out.write_all(b",\"frames\":[")?;
 
@@ -108,14 +126,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "frame_id": f.frame_id,
                 "ego": { "x": round2(f.ego.x), "v": round2(f.ego.v) },
                 "path": path,
-                "vehicles": f.tracks.iter().map(|tr| serde_json::json!({
-                    "id": tr.id,
-                    "x": round2(tr.x),
-                    "y": round2(tr.y),
-                    "vx": round2(tr.vx),
-                    "vy": round2(tr.vy),
-                    "state": tr.state,
-                })).collect::<Vec<_>>(),
+                "vehicles": f.tracks.iter().map(|tr| {
+                    let (kind, w, l, h) = class_kind(tr.cls);
+                    serde_json::json!({
+                        "id": tr.id,
+                        "cls": tr.cls,
+                        "kind": kind,
+                        "w": w,
+                        "l": l,
+                        "h": h,
+                        "x": round2(tr.x),
+                        "y": round2(tr.y),
+                        "vx": round2(tr.vx),
+                        "vy": round2(tr.vy),
+                        "state": tr.state,
+                    })
+                }).collect::<Vec<_>>(),
                 "cipo": serde_json::json!({
                     "valid": f.cipo.valid,
                     "track_id": f.cipo.track_id,

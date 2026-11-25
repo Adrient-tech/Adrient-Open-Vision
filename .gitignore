@@ -8,3 +8,7 @@ viewer/scene.json
 
 # Workspace agent notes (internal, not part of the product)
 .mlai/
+
+# Node (realtime server)
+server/node_modules/
+server/package-lock.json

@@ -91,6 +91,7 @@ struct TrackOut {
     hits: u32,
     missed: u32,
     state: &'static str,
+    cls: i32,
 }
 
 #[derive(Serialize)]
@@ -124,6 +125,7 @@ struct Track {
     missed: u32,
     state: State,
     counted: bool,
+    cls: i32, // model class id of the most recent matched detection
 }
 
 // Simple per-track constant-velocity filter (diagonal, per axis):
@@ -145,7 +147,7 @@ impl Track {
         self.missed += 1;
     }
 
-    fn update(&mut self, mx: f64, my: f64, dt: f64) {
+    fn update(&mut self, mx: f64, my: f64, cls: i32, dt: f64) {
         // Velocity update folded into position update for the CV model.
         let kx = self.cov_x / (self.cov_x + R_POS);
         let ky = self.cov_y / (self.cov_y + R_POS);
@@ -159,6 +161,7 @@ impl Track {
         self.cov_y *= 1.0 - ky;
         self.hits += 1;
         self.missed = 0;
+        self.cls = cls;
         if self.state == State::Tentative && self.hits >= CONFIRM_HITS {
             self.state = State::Confirmed;
         }
@@ -207,7 +210,7 @@ impl WorldModel {
         }
 
         // 2. Map ego-frame detections into the world frame.
-        let meas: Vec<(f64, f64)> = f.dets.iter().map(|d| (self.ego_x + d.x, d.y)).collect();
+        let meas: Vec<(f64, f64, i32)> = f.dets.iter().map(|d| (self.ego_x + d.x, d.y, d.cls)).collect();
 
         // 3. Greedy nearest-neighbour association inside the gate.
         let mut assigned_t: Vec<bool> = vec![false; self.tracks.len()];
@@ -230,7 +233,7 @@ impl WorldModel {
             }
             assigned_t[*ti] = true;
             assigned_m[*mi] = true;
-            self.tracks[*ti].update(meas[*mi].0, meas[*mi].1, self.dt);
+            self.tracks[*ti].update(meas[*mi].0, meas[*mi].1, meas[*mi].2, self.dt);
         }
         for (mi, m) in meas.iter().enumerate() {
             if assigned_m[mi] {
@@ -249,6 +252,7 @@ impl WorldModel {
                 missed: 0,
                 state: State::Tentative,
                 counted: false,
+                cls: m.2,
             });
             self.next_id += 1;
             self.n_created += 1;
@@ -314,6 +318,7 @@ impl WorldModel {
                         State::Confirmed => "confirmed",
                         State::Coasting => "coasting",
                     },
+                    cls: t.cls,
                 })
                 .collect(),
             cipo: CipoOut {
@@ -417,12 +422,12 @@ mod tests {
         let mut t = Track {
             id: 1, x: 50.0, y: 0.0, vx: 8.0, vy: 0.0,
             cov_x: R_POS, cov_y: R_POS, age: 1, hits: 1, missed: 0,
-            state: State::Tentative, counted: false,
+            state: State::Tentative, counted: false, cls: 0,
         };
         assert_eq!(t.state, State::Tentative);
-        t.update(50.3, 0.0, 0.1);
+        t.update(50.3, 0.0, 0, 0.1);
         assert_eq!(t.state, State::Tentative, "2 hits must not confirm");
-        t.update(50.6, 0.0, 0.1);
+        t.update(50.6, 0.0, 0, 0.1);
         assert_eq!(t.state, State::Confirmed, "3rd hit must confirm");
     }
 
@@ -431,11 +436,11 @@ mod tests {
         let mut t = Track {
             id: 1, x: 50.0, y: 0.0, vx: 8.0, vy: 0.0,
             cov_x: R_POS, cov_y: R_POS, age: 1, hits: 1, missed: 0,
-            state: State::Confirmed, counted: true,
+            state: State::Confirmed, counted: true, cls: 0,
         };
         t.predict(0.1);
         assert_eq!(t.missed, 1);
-        t.update(51.0, 0.0, 0.1);
+        t.update(51.0, 0.0, 0, 0.1);
         assert_eq!(t.missed, 0, "update must reset misses");
     }
 
