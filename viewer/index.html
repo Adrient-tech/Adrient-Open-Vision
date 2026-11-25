@@ -145,10 +145,16 @@ const pathLine = new THREE.Line(
 );
 scene.add(pathLine);
 
+// Tier from the URL (?tier=beginner|mid|top, default beginner) — mirrors the
+// pipeline's tier flag: it picks render quality only, never invents content.
+const TIER = (new URLSearchParams(location.search).get('tier') || 'beginner').toLowerCase();
+const TIER_RECON = { beginner: { size: 0.16 }, mid: { size: 0.12 }, top: { size: 0.09 } };
+const reconStyle = TIER_RECON[TIER] || TIER_RECON.beginner;
+
 // ── 3D reconstruction layer: the camera images converted into actual geometry
-// (MiDaS depth back-projected and fused across frames — the same world space
-// the tracked boxes live in). Loaded from assets/reconstruction.bin, a flat
-// interleaved buffer of float32 x,y,z + uint8 r,g,b per point, produced by
+// (monocular depth back-projected and fused across frames — the same world
+// space the tracked boxes live in). Loaded from assets/reconstruction.bin, a
+// flat interleaved buffer of float32 x,y,z + uint8 r,g,b per point, produced by
 // scripts/reconstruct3d.py. Rendered as coloured points; the wireframe grid is
 // hidden while it is on, because the real road replaces it.
 const gridHelper = scene.children.find(o => o.isGridHelper);
@@ -179,7 +185,7 @@ fetch('assets/reconstruction.json').then(r => { if (!r.ok) throw new Error(r.sta
       geo.setAttribute('position', new THREE.BufferAttribute(xyz, 3));
       geo.setAttribute('color', new THREE.BufferAttribute(rgb, 3, true));
       reconGroup.add(new THREE.Points(geo, new THREE.PointsMaterial({
-        size: 0.16, vertexColors: true, sizeAttenuation: true })));
+        size: reconStyle.size, vertexColors: true, sizeAttenuation: true })));
       const btn = document.getElementById('reconBtn');
       btn.disabled = false;
       btn.textContent = 'Reconstruction: off';
@@ -449,19 +455,9 @@ function updateRoad(pathIn) {
   }
   roadGroup.add(new THREE.LineSegments(
     new THREE.BufferGeometry().setFromPoints(dashes), dashMat));
-  const poleMat = new THREE.MeshLambertMaterial({ color: 0x3a4356 });
-  const lampMat = new THREE.MeshBasicMaterial({ color: 0xf4e6c0 });
-  // Light poles along the verge every ~12 m, alternating sides — matching the
-  // freeway in the source video (no trees; it's a highway, not a street).
-  for (let i = 2; i < path.length - 2; i += 3) {
-    const [x, y] = path[i];
-    const side = (i / 3) % 2 ? 1 : -1;         // alternate sides
-    const z = y + side * (LANE_W + 1.2);
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 6, 6), poleMat);
-    pole.position.set(z, 3, x); roadGroup.add(pole);
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.9), lampMat);
-    lamp.position.set(z - side * 0.4, 6, x); roadGroup.add(lamp);
-  }
+  // No decorative street furniture: everything on the road plane must come from
+  // the perception/reconstruction stages, not invented (Tier 2 adds poles only
+  // when segmentation actually detects them).
 }
 
 // ── ADAS: turn indicator from path curvature, forward-collision and

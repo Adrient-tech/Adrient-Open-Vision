@@ -39,10 +39,13 @@ docs/         setup, configuration and architecture documentation
 ## Quick start
 
 ```bash
-# Build and run the full pipeline (first run compiles the engine)
-scripts/run_pipeline.sh
+# Build and run the full pipeline (first run compiles the engine).
+# Ends with the 3D reconstruction written into viewer/assets/.
+scripts/run_pipeline.sh                          # tier: beginner (default)
+scripts/run_pipeline.sh <video.mp4> 10 mid       # Depth Anything V2 + road mask
+scripts/run_pipeline.sh <video.mp4> 10 top       # densest cloud
 
-# Serve the viewer
+# Serve the viewer (add ?tier=mid or ?tier=top to match the pipeline tier)
 python3 -m http.server 3000 --directory viewer
 # open http://localhost:3000
 ```
@@ -135,23 +138,48 @@ details and the retraining guide: **[models/README.md](models/README.md)** and
 ## 3D reconstruction (video → geometry)
 
 `scripts/reconstruct3d.py` converts the dashcam video into actual 3D geometry,
-the way Tesla's render does: every frame's MiDaS depth is calibrated against
+the way Tesla's render does: every frame's monocular depth is calibrated against
 the ground-plane homography (`engine/config/H.yaml`), back-projected to metric
-3D, and fused across frames using the ego odometry from `world_state.jsonl`:
+3D, and fused across frames using the ego odometry from `world_state.jsonl`.
+This is **step 4/4 of `scripts/run_pipeline.sh`** — a full pipeline run ends
+with the cloud written to `viewer/assets/`:
 
 ```bash
 python3 scripts/reconstruct3d.py <input.mp4> <world_state.jsonl> \
     engine/config/H.yaml engine/assets/depth/midas-small.onnx viewer/assets
 ```
 
+With `--road-mask engine/assets/seg/ddrnet23_slim.onnx` (the mid/top tiers do
+this automatically), near-ground points are kept only where DDRNet23-Slim
+segmentation actually sees road or sidewalk — no invented geometry.
+
 It writes `viewer/assets/reconstruction.{bin,json}`; the viewer's
 **Reconstruction** toggle renders the fused, coloured point cloud in the same
 world space as the tracked boxes (the wireframe grid hides while it is on).
+
+## Tiers and system requirements
+
+One codebase, three fidelity levels. The pipeline takes the tier as its third
+argument (`scripts/run_pipeline.sh <video> <fps> <tier>`), the viewer picks
+render quality with `index.html?tier=mid`.
+
+| | **Beginner** (default) | **Mid** | **Top** |
+|---|---|---|---|
+| Idea | boxes-era world (Tesla v9 style) | closer to Tesla, less rendering | "GTA-style" live |
+| Depth | MiDaS-small | Depth Anything V2 small | Depth Anything V2 small |
+| Road segmentation | — | DDRNet23-Slim road mask | DDRNet23-Slim road mask |
+| Reconstruction density | stride 3, 0.45 m voxel | stride 2, 0.35 m voxel | stride 1, 0.25 m voxel |
+| Multi-camera BEV fusion | — | — | yes (GPU host) |
+| Neural rendering / splats | — | — | yes (GPU host) |
+| **Hardware — minimum** | 4-core CPU, 8 GB RAM, no GPU | 8-core CPU, 16 GB RAM, or 4 GB-VRAM GPU | 12+ core CPU, 32 GB RAM, 12–24 GB VRAM (RTX 4070+) |
+| **Live rate** | offline only | ~5–10 fps GPU / ~2 fps CPU | 20–30 fps (fused BEV + render) |
+| **Storage** | 5 GB | 10 GB | 50 GB (multi-cam + splats) |
 
 ## Documentation
 
 | Page | Contents |
 |---|---|
+| [docs/tiers.md](docs/tiers.md) | Tiers (beginner/mid/top), system requirements, multi-camera BEV path |
 | [docs/camera-setup.md](docs/camera-setup.md) | Camera setup: single dashcam, multi-camera ring, BEV type, calibration, troubleshooting |
 | [docs/cpu-setup.md](docs/cpu-setup.md) | CPU-only build and run, performance tuning |
 | [docs/gpu-setup.md](docs/gpu-setup.md) | CPU + GPU setup with the CUDA ONNX Runtime, remote GPU hosts |
