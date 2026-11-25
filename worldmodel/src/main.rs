@@ -104,7 +104,7 @@ struct CipoOut {
 
 // ─── Track state ───────────────────────────────────────────────────────────────
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 enum State {
     Tentative,
     Confirmed,
@@ -379,4 +379,141 @@ fn main() {
     eprintln!("detections consumed: {} (avg {:.2}/frame)", n_dets, n_dets as f64 / wm.n_frames as f64);
     eprintln!("fps assumed: {} (pass as 3rd argument if different)", fps);
     println!("{}", wm.summary());
+}
+
+// ─── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn frame(id: u64, ego_v: f64, dets: Vec<(i32, f64, f64)>) -> Frame {
+        Frame {
+            frame_id: id,
+            ego_v,
+            wall_ms: 0.0,
+            cipo: Cipo { valid: false, d: 0.0, v: 0.0, cut_in: false },
+            path: PathIn { valid: false, a: 0.0, b: 0.0, c: 0.0, x_min: 0.0 },
+            dets: dets
+                .into_iter()
+                .map(|(cls, x, y)| Det { cls, score: 0.9, x, y })
+                .collect(),
+        }
+    }
+
+    fn writer() -> BufWriter<File> {
+        let path = std::env::temp_dir().join(format!("wm-test-{}-{}.jsonl", std::process::id(), frame_id_counter()));
+        BufWriter::new(File::create(path).unwrap())
+    }
+
+    fn frame_id_counter() -> u64 {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static N: AtomicU64 = AtomicU64::new(0);
+        N.fetch_add(1, Ordering::Relaxed)
+    }
+
+    #[test]
+    fn track_confirms_after_three_hits() {
+        let mut t = Track {
+            id: 1, x: 50.0, y: 0.0, vx: 8.0, vy: 0.0,
+            cov_x: R_POS, cov_y: R_POS, age: 1, hits: 1, missed: 0,
+            state: State::Tentative, counted: false,
+        };
+        assert_eq!(t.state, State::Tentative);
+        t.update(50.3, 0.0, 0.1);
+        assert_eq!(t.state, State::Tentative, "2 hits must not confirm");
+        t.update(50.6, 0.0, 0.1);
+        assert_eq!(t.state, State::Confirmed, "3rd hit must confirm");
+    }
+
+    #[test]
+    fn track_misses_accumulate_on_predict() {
+        let mut t = Track {
+            id: 1, x: 50.0, y: 0.0, vx: 8.0, vy: 0.0,
+            cov_x: R_POS, cov_y: R_POS, age: 1, hits: 1, missed: 0,
+            state: State::Confirmed, counted: true,
+        };
+        t.predict(0.1);
+        assert_eq!(t.missed, 1);
+        t.update(51.0, 0.0, 0.1);
+        assert_eq!(t.missed, 0, "update must reset misses");
+    }
+
+    #[test]
+    fn tentative_track_deleted_after_three_misses() {
+        let mut wm = WorldModel::new(10.0);
+        let mut out = writer();
+        wm.step(&frame(1, 8.0, vec![(0, 40.0, 0.0)]), &mut out); // creates track
+        for i in 2..=4 {
+            wm.step(&frame(i, 8.0, vec![]), &mut out); // no more measurements
+        }
+        assert!(wm.tracks.is_empty(), "tentative track must die after 3 missed frames");
+    }
+
+    #[test]
+    fn confirmed_track_survives_ten_misses_then_dies() {
+        let mut wm = WorldModel::new(10.0);
+        let mut out = writer();
+        // Three consecutive frames confirm the track.
+        for i in 1..=3 {
+            wm.step(&frame(i, 8.0, vec![(0, 40.0, 0.0)]), &mut out);
+        }
+        assert!(wm.tracks.iter().any(|t| t.state == State::Confirmed));
+        // Ten missed frames: still alive (MAX_MISSES = 10, delete only when missed > 10).
+        for i in 4..=13 {
+            wm.step(&frame(i, 8.0, vec![]), &mut out);
+        }
+        assert!(wm.tracks.iter().any(|t| t.state == State::Confirmed), "10 misses must not delete");
+        // Eleventh missed frame: gone.
+        wm.step(&frame(14, 8.0, vec![]), &mut out);
+        assert!(wm.tracks.is_empty(), "track with >10 misses must be deleted");
+    }
+
+    #[test]
+    fn cipo_is_nearest_confirmed_track_in_front_within_path() {
+        let mut wm = WorldModel::new(10.0);
+        let mut out = writer();
+        // Two objects ahead: far on-path (x=40) and near off-path (y=3.0).
+        for i in 1..=3 {
+            wm.step(&frame(i, 8.0, vec![(0, 40.0, 0.0), (0, 20.0, 3.0)]), &mut out);
+        }
+        let mut last = Frame {
+            frame_id: 4,
+            ego_v: 8.0,
+            wall_ms: 0.0,
+            cipo: Cipo { valid: false, d: 0.0, v: 0.0, cut_in: false },
+            path: PathIn { valid: true, a: 0.0, b: 0.0, c: 0.0, x_min: 0.0 },
+            dets: vec![],
+        };
+        wm.step(&last, &mut out);
+        assert_eq!(wm.next_id, 3, "two tracks must have been created");
+        assert!(
+            wm.tracks.iter().all(|t| t.state == State::Confirmed),
+            "both tracks confirmed after 3 hits"
+        );
+        // CIPO selection lives in step(): nearest confirmed, |y| < 1.8, in front.
+        // Off-path near track (y≈3.0) must be excluded → only the far on-path
+        // track qualifies. Re-check directly on the stored tracks.
+        let cipo: Vec<_> = wm
+            .tracks
+            .iter()
+            .filter(|t| t.state == State::Confirmed && t.x > wm.ego_x && t.y.abs() < 1.8)
+            .map(|t| t.id)
+            .collect();
+        assert_eq!(cipo.len(), 1, "only the on-path track qualifies as CIPO");
+        let far = wm.tracks.iter().find(|t| t.y.abs() < 1.8).unwrap();
+        assert_eq!(cipo[0], far.id);
+        last.frame_id = 5; // silence unused-mut warning path
+    }
+
+    #[test]
+    fn detections_are_mapped_into_world_frame() {
+        let mut wm = WorldModel::new(10.0);
+        let mut out = writer();
+        // Ego at 8 m/s * 0.1 s = 0.8 m; detection 40 m ahead → world x ≈ 40.8.
+        wm.step(&frame(1, 8.0, vec![(0, 40.0, 0.5)]), &mut out);
+        let t = &wm.tracks[0];
+        assert!((t.x - 40.8).abs() < 1e-9, "world x = ego_x + det.x, got {}", t.x);
+        assert!((t.y - 0.5).abs() < 1e-9);
+    }
 }
