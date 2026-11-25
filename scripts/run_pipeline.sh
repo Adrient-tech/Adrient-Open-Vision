@@ -4,12 +4,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 FPS="${2:-10}"
-BUILD=perception/VisionPilot/build
+BUILD=engine/build
 
-if [ ! -x "$BUILD/VisionPilot" ]; then
+if [ ! -x "$BUILD/OpenVision" ]; then
   echo "Building perception (first run)…"
   export CMAKE_POLICY_VERSION_MINIMUM=3.5   # Arrow/mimalloc sub-builds need it too
-  cmake -S perception/VisionPilot -B "$BUILD" \
+  cmake -S engine -B "$BUILD" \
       -DCMAKE_BUILD_TYPE=Release -DENABLE_RERUN=ON \
       -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
       -DCMAKE_PREFIX_PATH="$PWD/third_party/boost-cmake/boost_system-1.90.0" \
@@ -19,30 +19,29 @@ fi
 
 echo "1/3 Perception…"
 cd "$BUILD"
-cp -n ../config/vision_pilot.conf . 2>/dev/null || true
-# Offline run: dataset input, CPU provider, no realtime clock (per docs/phase1)
-# Offline run: dataset input, CPU provider, no realtime clock (per docs/phase1).
-# The app reads input paths from vision_pilot_test.conf (see modules/config/src);
+cp -n ../config/openvision.conf . 2>/dev/null || true
+# Offline run: dataset input, CPU provider, no realtime clock.
+# The app reads input paths from openvision_test.conf (see modules/config/src);
 # find_config() prefers <cwd>/config/, so patch the copies inside build/config.
-cat > config/vision_pilot_test.conf <<CFG
+cat > config/openvision_test.conf <<CFG
 source.video_realtime      = false
 source.video_loop          = false
 source.input_video         = $OLDPWD/data/sample_dataset/test_open_lane_10/input.mp4
 source.input_vehicle_speed = $OLDPWD/data/sample_dataset/test_open_lane_10/frame_speed.txt
 source.dataset             = open_lane
 CFG
-grep -q "OpenVision pipeline overrides" config/vision_pilot.conf || cat >> config/vision_pilot.conf <<CFG
+grep -q "OpenVision pipeline overrides" config/openvision.conf || cat >> config/openvision.conf <<CFG
 
 # ─── OpenVision pipeline overrides (added by scripts/run_pipeline.sh) ───
 engine.provider            = cpu
 world_log_on               = true
 CFG
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}:$OLDPWD/third_party/onnxruntime-cpu/lib" \
-  xvfb-run -a ./VisionPilot
+  xvfb-run -a ./OpenVision
 cd "$OLDPWD"
 
 echo "2/3 World model…"
-(cd worldmodel && cargo run --release -- \
+(cd worldmodel && cargo run --release --bin worldmodel -- \
     "../$BUILD/perception.jsonl" "../$BUILD/world_state.jsonl" "$FPS")
 
 echo "3/3 Scene adapter…"

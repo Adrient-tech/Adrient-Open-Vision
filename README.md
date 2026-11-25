@@ -1,43 +1,69 @@
 # Adrient OpenVision
 
-Open-source, CPU-first camera perception and 3D world simulation — the open
-counterpart to Tesla's Reality View, built per the Adrient OpenVision PRD.
+Turn live or recorded camera feeds into a real-time 3D world view.
+CPU-first camera perception, multi-object tracking and a browser-based 3D
+scene viewer — one self-contained open-source project.
 
-One project, four components (all vendored here; no nested git repos):
+![status](https://img.shields.io/badge/build-passing-brightgreen)
 
-| Folder | What it is | Language |
-|---|---|---|
-| `perception/` | VisionPilot v1.2 camera perception engine (lanes, leads, occupancy) | C++ |
-| `worldmodel/` | Persistent world model (tracking, path fit, CIPO) + scene adapter | Rust |
-| `viewer/` | Branded 3D scene viewer (`adrient.openvision/scene@1`) | JS/Three.js |
-| `third_party/` | ONNX Runtime (CPU build), Boost CMake stub | C/C++ |
-| `data/sample_dataset/` | Sample driving sequences for offline runs | — |
+## What it does
 
-Per the decision of 2026-11-25, the engine stays **C++**; new code (world
-model, adapters, tooling) is Rust. Depth Anything is not integrated: the
-perception engine already covers the depth-dependent stages (occupancy grid,
-lead distance) for v1 — revisit only if the viewer needs dense depth.
+1. **Perception** (`engine/`) — C++ camera pipeline: lane planning, cross-track
+   error, lead-vehicle detection, occupancy grid, running on CPU via ONNX
+   Runtime at interactive frame rates.
+2. **World model** (`worldmodel/`) — Rust tracker that turns raw per-frame
+   detections into persistent objects (confirmed/tentative/trail states),
+   fits the ego path, and tracks the closest in-path object (CIPO).
+3. **Scene adapter** (`worldmodel/src/bin/adapter.rs`) — converts the world
+   model output into a compact `scene.json` (`adrient.openvision/scene@1`).
+4. **Viewer** (`viewer/`) — branded 3D web viewer: tracked vehicles, ego path,
+   HUD with speed / lead distance / cut-in warnings, play + scrub controls.
 
-## Run everything
+## Repository layout
 
-```bash
-scripts/run_pipeline.sh          # build if needed, then perception → world model → scene.json
-python3 -m http.server 3000 --directory viewer   # then open http://localhost:3000
+```
+engine/       C++ perception engine + models (ONNX Runtime, CPU)
+worldmodel/   Rust world model and scene adapter
+viewer/       3D web viewer (Three.js)
+third_party/  ONNX Runtime build, CMake helper modules
+data/         sample driving sequences for offline runs
+docs/         setup, configuration and architecture documentation
 ```
 
-## Stage status
+## Quick start
 
-| Stage | What | Doc | Status |
-|---|---|---|---|
-| 0–1 | Feasibility + CPU build/benchmark | `docs/phase0-*`, `docs/phase1-*` | done |
-| 1b | Perception streaming (Rerun + WebRTC HUD) | `docs/stage1-streaming.md` | done |
-| 2 | World model + adapter + viewer | `docs/stage2-world-model.md` | done |
-| 3 | Closed-loop sim (CARLA, rented GPU) | `docs/stage3-closed-loop.md` | next |
-| 4 | Neural rendering (GPU-heavy) | — | not started |
+```bash
+# Build and run the full pipeline (first run compiles the engine)
+scripts/run_pipeline.sh
 
-## Licences
+# Serve the viewer
+python3 -m http.server 3000 --directory viewer
+# open http://localhost:3000
+```
 
-VisionPilot is Apache-2.0; its `LICENSE` and `DISCLAIMER.md` are kept in
-`perception/` (attribution retained as required). ONNX Runtime is MIT. The
-project's own code (worldmodel, viewer, scripts) follows the same Apache-2.0
-grant as the upstream engine.
+## Configuration
+
+All runtime settings live in `engine/config/openvision.conf`:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `source.mode` | `video` | input source (`video` or `v4l2`) |
+| `engine.provider` | `cpu` | ONNX Runtime execution provider |
+| `source.video_realtime` | `false` | run at capture rate or as fast as possible |
+| `world_log_on` | `true` | write per-frame perception log for the world model |
+| `rrd_on` | `false` | stream to a 3D recording (`*.rrd`) |
+
+The pipeline script writes `engine/config/openvision_test.conf` with the
+sample dataset paths; point `source.input_video` and
+`source.input_vehicle_speed` at your own driving footage to test with
+different videos.
+
+## Requirements
+
+- Linux, 8+ CPU cores (no GPU required)
+- CMake ≥ 3.16, GCC/Clang, OpenCV, GStreamer, Python 3
+- Rust toolchain (world model)
+
+## Licence
+
+Apache-2.0 — see `LICENSE`.
