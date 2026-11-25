@@ -1,0 +1,7 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>OpenVision live endpoint</title>
+<style>body{background:#0b0e14;color:#e8edf5;font:15px/1.5 system-ui,sans-serif;max-width:640px;margin:60px auto;padding:0 20px}code{background:#161c29;padding:2px 6px;border-radius:4px}a{color:#4da3ff}</style></head><body>
+<h1>OpenVision live endpoint</h1>
+<p>This is the WebSocket endpoint of the realtime broadcast server, protocol <code>adrient.openvision/live@1</code>. The 3D viewer connects here automatically — open <a href="/">the Live Instrument</a> and press <b>Go live</b>.</p>
+<p>Direct connection: <code>ws://host:8081/live</code>. Server sends <code>hello</code>, <code>frame</code>, <code>ping</code>; client may send <code>{"type":"resume","after":&lt;last frame_id&gt;}</code> to replay missed frames and <code>pong</code>.</p>
+<p>Start the server: <code>node server/live.mjs --port 8081 --replay viewer/scene.json</code> (or <code>--tail world_state.jsonl 10</code> for a live feed).</p>
+</body></html>
