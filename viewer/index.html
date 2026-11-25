@@ -121,8 +121,22 @@ import { GLTFLoader } from './vendor/GLTFLoader.js';
 
 const err = document.getElementById('err');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0b0e14);
-scene.fog = new THREE.Fog(0x0b0e14, 60, 160);
+// Daylight sky: a vertical-gradient dome so the horizon reads like a driving
+// game, not a debug viewport. Fog matches the horizon colour.
+{
+  const c = document.createElement('canvas'); c.width = 4; c.height = 256;
+  const g = c.getContext('2d').createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0, '#dbe9f4');   // horizon haze (visible band above the road)
+  g.addColorStop(0.35, '#8fbce8'); // mid sky
+  g.addColorStop(1, '#3f7fd4');   // zenith
+  const ctx = c.getContext('2d'); ctx.fillStyle = g; ctx.fillRect(0, 0, 4, 256);
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(420, 24, 16),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), side: THREE.BackSide, fog: false, depthWrite: false })
+  );
+  scene.add(sky);
+}
+scene.fog = new THREE.Fog(0xdbe9f4, 90, 380);
 
 const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 500);
 const renderer = new THREE.WebGLRenderer({ antialias:true });
@@ -134,9 +148,17 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-scene.add(new THREE.GridHelper(400, 200, 0x232b3b, 0x161c29));
-scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-const sun = new THREE.DirectionalLight(0xffffff, 0.9); sun.position.set(20, 40, 30); scene.add(sun);
+// Terrain: a large ground sheet under everything (dry-grass verge beside a
+// freeway). The road ribbon and lane markings sit slightly above it.
+const terrain = new THREE.Mesh(
+  new THREE.PlaneGeometry(1200, 1200),
+  new THREE.MeshLambertMaterial({ color: 0x647c4a })
+);
+terrain.rotation.x = -Math.PI / 2;
+terrain.position.y = -0.05;
+scene.add(terrain);
+scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x54603c, 0.85));
+const sun = new THREE.DirectionalLight(0xfff3df, 1.4); sun.position.set(30, 60, 20); scene.add(sun);
 
 const objects = new THREE.Group(); scene.add(objects);
 const pathLine = new THREE.Line(
@@ -157,7 +179,7 @@ const reconStyle = TIER_RECON[TIER] || TIER_RECON.beginner;
 // flat interleaved buffer of float32 x,y,z + uint8 r,g,b per point, produced by
 // scripts/reconstruct3d.py. Rendered as coloured points; the wireframe grid is
 // hidden while it is on, because the real road replaces it.
-const gridHelper = scene.children.find(o => o.isGridHelper);
+const gridHelper = null; // wireframe grid removed — real terrain + road instead
 const reconGroup = new THREE.Group(); reconGroup.visible = false; scene.add(reconGroup);
 fetch('assets/reconstruction.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
   .then(hdr => fetch('assets/reconstruction.bin')
@@ -389,9 +411,10 @@ let live = null, liveLastFrameId = null, liveRetry = 0;
 // dashed centre line sits at +3.5 m lateral.
 const LANE_W = 3.5;
 const roadGroup = new THREE.Group(); scene.add(roadGroup);
-const roadMat = new THREE.MeshBasicMaterial({ color: 0x11151d, transparent: true, opacity: 0.94, depthWrite: false });
-const edgeMat = new THREE.LineBasicMaterial({ color: 0xd8e2f2 });
-const dashMat  = new THREE.LineBasicMaterial({ color: 0xf4c542 });
+const roadMat  = new THREE.MeshBasicMaterial({ color: 0x4a4f57, side: THREE.DoubleSide });           // asphalt, clearly visible
+const shoulderMat = new THREE.MeshBasicMaterial({ color: 0x3d4249, side: THREE.DoubleSide });        // darker verge strip
+const edgeMat  = new THREE.MeshBasicMaterial({ color: 0xf2f5f8, side: THREE.DoubleSide });           // solid white edge lines
+const dashMat  = new THREE.MeshBasicMaterial({ color: 0xf4c542, side: THREE.DoubleSide });           // yellow lane divider
 // Smooth the fitted path: the quadratic lane fit wiggles frame to frame, so a
 // moving average (window 5) keeps the road steady under the vehicles.
 function smoothPath(path) {
@@ -434,27 +457,43 @@ function ribbon(pts, half, y) {
   g.setIndex(idxArr);
   return g;
 }
+function offsetRibbon(pts, center, half, y) {
+  // Like ribbon(), but the strip is centred `center` metres lateral of the path.
+  const pos = [], idxArr = [];
+  pts.forEach(([x, ly], i) => {
+    pos.push(ly + center - half, y, x, ly + center + half, y, x);
+    if (i > 0) {
+      const a = 2 * i - 2;
+      idxArr.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+    }
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idxArr);
+  return g;
+}
 function updateRoad(pathIn) {
   roadGroup.clear();
   const path = smoothPath(pathIn);
   if (!path || path.length < 2) return;
-  // Asphalt: one lane either side of our centreline.
-  const asphalt = new THREE.Mesh(ribbon(path, LANE_W, 0.02), roadMat);
-  roadGroup.add(asphalt);
-  // Solid lane edges.
+  // Paved shoulders either side, then the asphalt: one lane either side of our
+  // centreline. Drawn at slightly different heights so nothing z-fights.
+  roadGroup.add(new THREE.Mesh(offsetRibbon(path, 0, LANE_W + 2.2, 0.0), shoulderMat));
+  roadGroup.add(new THREE.Mesh(ribbon(path, LANE_W, 0.02), roadMat));
+  // Solid white lane edges as 0.15 m ribbons (1-px lines vanish at distance).
   for (const s of [-LANE_W / 2, LANE_W / 2])
-    roadGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(
-      path.map(([x, y]) => new THREE.Vector3(y + s, 0.04, x))), edgeMat));
-  // Dashed adjacent-lane divider (3 m dash / 3 m gap), on the left of our lane.
-  const dashes = [];
-  for (let i = 0; i + 1 < path.length; i++) {
-    if (i % 2) continue; // alternate segments = dash/gap
-    const [x1, y1] = path[i], [x2, y2] = path[i + 1];
-    dashes.push(new THREE.Vector3(y1 + LANE_W + 1.75, 0.04, x1),
-                new THREE.Vector3(y2 + LANE_W + 1.75, 0.04, x2));
-  }
-  roadGroup.add(new THREE.LineSegments(
-    new THREE.BufferGeometry().setFromPoints(dashes), dashMat));
+    roadGroup.add(new THREE.Mesh(offsetRibbon(path, s, 0.075, 0.04), edgeMat));
+  // Dashed yellow adjacent-lane divider (2-segment dash / 2-segment gap), left.
+  let dashSeg = [];
+  const flush = () => {
+    if (dashSeg.length >= 2)
+      roadGroup.add(new THREE.Mesh(offsetRibbon(dashSeg, LANE_W + 1.75, 0.075, 0.04), dashMat));
+    dashSeg = [];
+  };
+  path.forEach((p, i) => {
+    if (Math.floor(i / 2) % 2 === 0) dashSeg.push(p); else flush();
+  });
+  flush();
   // No decorative street furniture: everything on the road plane must come from
   // the perception/reconstruction stages, not invented (Tier 2 adds poles only
   // when segmentation actually detects them).
