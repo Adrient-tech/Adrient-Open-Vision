@@ -1,0 +1,7 @@
+# Build outputs
+**/build/
+**/target/
+*.rrd
+viewer/scene.json
+*.o
+*.so

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adrient OpenVision — 3D Scene Viewer</title>
+<style>
+  :root { --bg:#0b0e14; --panel:#121722; --line:#232b3b; --accent:#4da3ff; --text:#e8edf5; --dim:#8a94a8; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--bg); color:var(--text); font:14px/1.4 system-ui, sans-serif; overflow:hidden; }
+  header { position:fixed; top:0; left:0; right:0; z-index:10; display:flex; align-items:center; gap:10px;
+           padding:10px 16px; background:linear-gradient(#0b0e14ee,#0b0e1400); }
+  header .logo { width:22px; height:22px; border-radius:6px;
+           background:conic-gradient(from 210deg, #4da3ff, #7c5cff 40%, #22d3a5 75%, #4da3ff); }
+  header h1 { font-size:15px; font-weight:600; }
+  header h1 span { color:var(--dim); font-weight:400; }
+  #hud { position:fixed; top:52px; left:16px; z-index:10; background:var(--panel); border:1px solid var(--line);
+         border-radius:10px; padding:12px 14px; min-width:210px; }
+  #hud .row { display:flex; justify-content:space-between; gap:16px; padding:3px 0; }
+  #hud .k { color:var(--dim); }
+  #hud .v { font-variant-numeric:tabular-nums; }
+  #hud .v.good { color:#22d3a5; }
+  #hud .v.warn { color:#ffb454; }
+  #cipo { margin-top:8px; border-top:1px solid var(--line); padding-top:8px; font-size:12px; color:var(--dim); }
+  #bar { position:fixed; left:0; right:0; bottom:0; z-index:10; display:flex; align-items:center; gap:12px;
+         padding:10px 16px; background:var(--panel); border-top:1px solid var(--line); }
+  #bar button { background:var(--accent); border:0; color:#04101f; font-weight:600; padding:7px 16px;
+                border-radius:8px; cursor:pointer; }
+  #bar input { flex:1; accent-color:var(--accent); }
+  #frameLabel { color:var(--dim); min-width:120px; text-align:right; font-variant-numeric:tabular-nums; }
+  #err { position:fixed; inset:auto 16px 64px 16px; color:#ff6b6b; z-index:11; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"></div>
+  <h1>Adrient <b>OpenVision</b> <span>— 3D scene viewer</span></h1>
+</header>
+<div id="hud">
+  <div class="row"><span class="k">Speed</span><span class="v" id="vSpeed">–</span></div>
+  <div class="row"><span class="k">Tracked vehicles</span><span class="v" id="vVeh">–</span></div>
+  <div class="row"><span class="k">Lead distance</span><span class="v" id="vLead">–</span></div>
+  <div id="cipo">Lead vehicle (CIPO): waiting for data…</div>
+</div>
+<div id="bar">
+  <button id="play">Play</button>
+  <input id="scrub" type="range" min="0" max="0" value="0" step="1">
+  <span id="frameLabel">frame –</span>
+</div>
+<div id="err"></div>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const err = document.getElementById('err');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0e14);
+scene.fog = new THREE.Fog(0x0b0e14, 60, 140);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 400);
+camera.position.set(0, 14, -18);
+camera.lookAt(0, 0, 20);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// Grid "road" reference plane
+const grid = new THREE.GridHelper(240, 120, 0x232b3b, 0x161c29);
+scene.add(grid);
+
+const vehicles = new THREE.Group(); scene.add(vehicles);
+const pathLine = new THREE.Line(
+  new THREE.BufferGeometry(),
+  new THREE.LineBasicMaterial({ color: 0x4da3ff })
+);
+scene.add(pathLine);
+
+const boxGeo = new THREE.BoxGeometry(2.0, 1.6, 4.6);
+const trailMat = new THREE.MeshLambertMaterial({ color: 0x7c5cff });
+const confMat  = new THREE.MeshLambertMaterial({ color: 0x4da3ff });
+const tentativeMat = new THREE.MeshLambertMaterial({ color: 0x39445c });
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const sun = new THREE.DirectionalLight(0xffffff, 0.9); sun.position.set(20, 40, 30); scene.add(sun);
+
+let frames = [], idx = 0, playing = true, lastT = 0;
+const $ = id => document.getElementById(id);
+
+fetch('scene.json').then(r => { if (!r.ok) throw new Error('scene.json not found (HTTP '+r.status+')'); return r.json(); })
+.then(data => {
+  frames = data.frames;
+  $('scrub').max = frames.length - 1;
+  show(0);
+})
+.catch(e => { err.textContent = 'Failed to load scene data: ' + e.message; });
+
+function show(i) {
+  idx = Math.max(0, Math.min(frames.length - 1, i));
+  const f = frames[idx];
+  if (!f) return;
+  $('scrub').value = idx;
+  $('frameLabel').textContent = 'frame ' + f.frame_id + '  (' + f.t.toFixed(1) + ' s)';
+
+  // Vehicles
+  vehicles.clear();
+  for (const v of f.vehicles) {
+    const m = new THREE.Mesh(boxGeo, v.state === 'confirmed' ? confMat
+                    : v.state === 'tentative' ? tentativeMat : trailMat);
+    m.position.set(v.y, 0.8, v.x);
+    vehicles.add(m);
+  }
+
+  // Path polyline
+  pathLine.geometry.setFromPoints(f.path.map(([x, y]) => new THREE.Vector3(y, 0.05, x)));
+
+  // HUD
+  $('vSpeed').textContent = f.ego.v.toFixed(1) + ' m/s';
+  $('vVeh').textContent = f.vehicles.length;
+  const c = f.cipo;
+  const lead = $('vLead'), cipoEl = $('cipo');
+  if (c.valid) {
+    lead.textContent = c.d.toFixed(1) + ' m';
+    lead.className = 'v ' + (c.cut_in ? 'warn' : 'good');
+    cipoEl.textContent = 'Lead vehicle (CIPO): id ' + c.track_id +
+      ', closing ' + Math.abs(c.v_rel).toFixed(1) + ' m/s' + (c.cut_in ? ' — CUT-IN RISK' : '');
+  } else {
+    lead.textContent = '–'; lead.className = 'v';
+    cipoEl.textContent = 'Lead vehicle (CIPO): none tracked';
+  }
+}
+
+function tick(t) {
+  if (playing && frames.length && t - lastT > 100) {
+    lastT = t;
+    show(idx + 1 >= frames.length ? 0 : idx + 1);
+  }
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+$('play').onclick = () => { playing = !playing; $('play').textContent = playing ? 'Play' : 'Pause'; };
+$('scrub').oninput = e => { playing = false; $('play').textContent = 'Play'; show(+e.target.value); };
+</script>
+</body>
+</html>
