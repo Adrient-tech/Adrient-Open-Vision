@@ -181,6 +181,18 @@ const reconStyle = TIER_RECON[TIER] || TIER_RECON.beginner;
 // hidden while it is on, because the real road replaces it.
 const gridHelper = null; // wireframe grid removed — real terrain + road instead
 const reconGroup = new THREE.Group(); reconGroup.visible = false; scene.add(reconGroup);
+let reconPoints = null;
+// Progressive reveal: show reconstructed points from the start of the drive up
+// to ~90 m ahead of the ego's current position. Behind the car the world stays
+// built — ahead of the window nothing is reconstructed yet.
+function updateReconWindow(egoX) {
+  if (!reconPoints) return;
+  const pos = reconPoints.geometry.getAttribute('position');
+  const limit = egoX + 90;
+  let lo = 0, hi = pos.count;                 // points sorted by forward coord
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (pos.array[mid * 3 + 2] <= limit) lo = mid + 1; else hi = mid; }
+  reconPoints.geometry.setDrawRange(0, lo);
+}
 fetch('assets/reconstruction.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
   .then(hdr => fetch('assets/reconstruction.bin')
     .then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
@@ -212,10 +224,21 @@ fetch('assets/reconstruction.json').then(r => { if (!r.ok) throw new Error(r.sta
         m++;
       }
       const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(xyz.subarray(0, m * 3), 3));
-      geo.setAttribute('color', new THREE.BufferAttribute(rgb.subarray(0, m * 3), 3, true));
-      reconGroup.add(new THREE.Points(geo, new THREE.PointsMaterial({
-        size: reconStyle.size, vertexColors: true, sizeAttenuation: true })));
+      // Sorted by forward distance so a draw-range reveal works: as the video
+      // plays and the ego advances, more of the reconstructed world appears —
+      // the "video converts into 3D" effect, in the true playback order.
+      const order = Array.from({ length: m }, (_, i) => i)
+        .sort((a, b) => xyz[a * 3 + 2] - xyz[b * 3 + 2]);
+      const sxyz = new Float32Array(m * 3), srgb = new Uint8Array(m * 3);
+      order.forEach((src, dst) => {
+        sxyz[dst * 3] = xyz[src * 3]; sxyz[dst * 3 + 1] = xyz[src * 3 + 1]; sxyz[dst * 3 + 2] = xyz[src * 3 + 2];
+        srgb[dst * 3] = rgb[src * 3]; srgb[dst * 3 + 1] = rgb[src * 3 + 1]; srgb[dst * 3 + 2] = rgb[src * 3 + 2];
+      });
+      geo.setAttribute('position', new THREE.BufferAttribute(sxyz, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(srgb, 3, true));
+      reconPoints = new THREE.Points(geo, new THREE.PointsMaterial({
+        size: reconStyle.size, vertexColors: true, sizeAttenuation: true }));
+      reconGroup.add(reconPoints);
       document.getElementById('reconBtn').title = m.toLocaleString() + ' points';
       const btn = document.getElementById('reconBtn');
       btn.disabled = false;
@@ -483,36 +506,50 @@ function offsetRibbon(pts, center, half, y) {
   g.setIndex(idxArr);
   return g;
 }
-// off = the ego's current absolute x. f.path is ego-relative (starts at 0),
-// so the road must be shifted to the ego's world position or it renders
-// stranded tens of metres behind the car.
-function updateRoad(pathIn, off) {
+// The road is built ONCE in absolute world coordinates: each frame's ego-
+// relative lane path is stitched onto the world by its ego.x. The world is
+// then fixed and the ego car visibly drives through it — rebuilding the road
+// around the car every frame made it scroll with the car (a treadmill), which
+// read as "nothing moves".
+function buildWorldRoad(frames) {
   roadGroup.clear();
-  const rel = smoothPath(pathIn);
-  if (!rel || rel.length < 2) return;
-  const path = rel.map(([x, y]) => [x + off, y]);
+  // Walk the frames front to back, keeping only path points that extend the
+  // stitched centreline further ahead than what earlier frames already drew.
+  const abs = [];
+  let maxX = -Infinity;
+  for (const f of frames) {
+    const off = f.ego.x, rel = smoothPath(f.path);
+    if (!rel) continue;
+    for (const [x, y] of rel) {
+      const wx = x + off;
+      if (wx > maxX + 2.0) { abs.push([wx, y]); maxX = wx; }
+    }
+  }
+  if (abs.length < 2) return;
   // Paved shoulders either side, then the asphalt: one lane either side of our
   // centreline. Drawn at slightly different heights so nothing z-fights.
-  roadGroup.add(new THREE.Mesh(offsetRibbon(path, 0, LANE_W + 2.2, 0.0), shoulderMat));
-  roadGroup.add(new THREE.Mesh(ribbon(path, LANE_W, 0.02), roadMat));
+  roadGroup.add(new THREE.Mesh(offsetRibbon(abs, 0, LANE_W + 2.2, 0.0), shoulderMat));
+  roadGroup.add(new THREE.Mesh(ribbon(abs, LANE_W, 0.02), roadMat));
   // Solid white lane edges as 0.15 m ribbons (1-px lines vanish at distance).
   for (const s of [-LANE_W / 2, LANE_W / 2])
-    roadGroup.add(new THREE.Mesh(offsetRibbon(path, s, 0.075, 0.04), edgeMat));
-  // Dashed yellow adjacent-lane divider (2-segment dash / 2-segment gap), left.
-  let dashSeg = [];
-  const flush = () => {
-    if (dashSeg.length >= 2)
-      roadGroup.add(new THREE.Mesh(offsetRibbon(dashSeg, LANE_W + 1.75, 0.075, 0.04), dashMat));
-    dashSeg = [];
-  };
-  path.forEach((p, i) => {
-    if (Math.floor(i / 2) % 2 === 0) dashSeg.push(p); else flush();
-  });
-  flush();
+    roadGroup.add(new THREE.Mesh(offsetRibbon(abs, s, 0.075, 0.04), edgeMat));
+  // Dashed yellow adjacent-lane divider, left. Dash/gap segments are spaced in
+  // absolute metres along the stitched centreline, so the markings stay fixed
+  // in the world while the car passes them.
+  const DASH = 3, GAP = 6;                       // standard 3 m dash / 6 m gap
+  const step = DASH + GAP;
+  const startX = Math.floor(abs[0][0] / step) * step;
+  for (let sx = startX; sx < abs[abs.length - 1][0]; sx += step) {
+    const seg = abs.filter(([x]) => x >= sx && x < sx + DASH);
+    if (seg.length >= 2)
+      roadGroup.add(new THREE.Mesh(offsetRibbon(seg, LANE_W + 1.75, 0.075, 0.04), dashMat));
+  }
   // No decorative street furniture: everything on the road plane must come from
   // the perception/reconstruction stages, not invented (Tier 2 adds poles only
   // when segmentation actually detects them).
+  worldPath = abs;
 }
+let worldPath = null; // absolute stitched centreline, for the path display
 
 // ── ADAS: turn indicator from path curvature, forward-collision and
 // crossing-vehicle warnings from tracked kinematics.
@@ -565,15 +602,20 @@ function show(i) {
   $('cBicycle').textContent = counts.bicycle;
 
   pathLine.geometry.setFromPoints(
-    smoothPath(f.path).map(([x, y]) => new THREE.Vector3(y, 0.05, x + f.ego.x)));
-  updateRoad(f.path, f.ego.x);
+    (worldPath || smoothPath(f.path).map(([x, y]) => [x + f.ego.x, y]))
+      .map(([x, y]) => new THREE.Vector3(y, 0.05, x)));
+  updateReconWindow(f.ego.x);
   updateAdas(f);
 
   // Ego car follows the tracked ego pose. Heading comes from the lane path at
   // the ego's own position, so a real turn yaws the model (and the camera
   // target rides the same forward point).
   egoGroup.position.set(0, 0, f.ego.x);
-  const heading = pathHeadingAt(f.path, f.ego.x);
+  // Heading: from the stitched absolute centreline at the ego's own world x
+  // (falling back to the frame path near its origin, which is where the car is
+  // in ego-relative coordinates).
+  const heading = worldPath ? pathHeadingAt(worldPath, f.ego.x)
+                            : pathHeadingAt(f.path, 0);
   egoGroup.rotation.y = heading; // model front faces +z (scene forward)
 
   // Camera follows the ego forward position in chase/orbit views.
@@ -628,6 +670,7 @@ function goLive(on) {
     } else if (m.type === 'frame') {
       liveLastFrameId = m.frame.frame_id;
       frames.push(m.frame);
+      buildWorldRoad(frames); // the road grows as the live drive streams in
       show(frames.length - 1);
     } else if (m.type === 'ping') {
       live.send(JSON.stringify({ type: 'pong' }));
@@ -649,6 +692,7 @@ function goLive(on) {
 fetch('scene.json').then(r => { if (!r.ok) throw new Error('scene.json not found (HTTP '+r.status+')'); return r.json(); })
 .then(data => {
   frames = data.frames;
+  buildWorldRoad(frames);
   show(0);
 })
 .catch(e => { err.textContent = 'Failed to load scene data: ' + e.message; });
